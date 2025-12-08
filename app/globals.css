@@ -120,3 +120,53 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Sandpack layout fixes - Critical for ResizablePanel integration */
+.sp-wrapper {
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.sp-preview-container {
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.sp-preview {
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.sp-preview iframe {
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+  flex: 1;
+}
+
+/* Prevent Sandpack from setting fixed dimensions */
+[class*="sp-"] {
+  box-sizing: border-box;
+}
+
+
+/* 
+.sandpack-wrapper iframe,
+.sandpack-wrapper canvas {
+  pointer-events: none;
+}
+.sandpack-wrapper:not(.resizing) iframe,
+.sandpack-wrapper:not(.resizing) canvas {
+  pointer-events: auto;
+} */

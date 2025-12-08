@@ -1,4 +1,20 @@
 import { create } from "zustand";
+let uuidv4: () => string;
+try {
+  // prefer the uuid package when available
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  uuidv4 = require("uuid").v4;
+} catch (e) {
+  uuidv4 = () => {
+    try {
+      return ([1e7].toString() + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c: any) => (
+        (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)
+      ));
+    } catch (err) {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    }
+  };
+}
 
 type ProjectMeta = {
   id: string;
@@ -39,16 +55,11 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
   projects: [],
   addProject: ({ name, description, status }) => {
     const existing = get().projects;
-    const idBase = name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "")
-      .slice(0, 40) || "project";
-    let id = idBase;
-    let counter = 1;
-    while (existing.find((p) => p.id === id)) {
-      id = `${idBase}-${counter++}`;
+    const normalized = (name || "").trim().toLowerCase();
+    if (existing.find((p) => (p.name || "").trim().toLowerCase() === normalized)) {
+      throw new Error("project name must be unique");
     }
+    const id = uuidv4();
 
     const meta: ProjectMeta = {
       id,

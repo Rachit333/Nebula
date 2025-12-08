@@ -18,22 +18,23 @@ export default function HomePage() {
       setFormData({ name: "", description: "" })
       setIsOpen(false)
       refresh()
-      try {
-        import("@/lib/firebaseClient").then(async (m) => {
-          const getIdToken = m.getIdToken as () => Promise<string | null>;
-          const token = await getIdToken();
-          if (!token) return;
-          const projectKey = `cipherstudio:project:${meta.id}`;
-          const raw = localStorage.getItem(projectKey);
-          if (!raw) return;
-          const payload = JSON.parse(raw);
-          fetch("/api/upstash/push", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ files: payload.files, projectId: meta.id, owner: meta.id }),
-          }).catch(() => {});
-        });
-      } catch (e) {}
+      // TODO: Re-enable Upstash Redis sync when ready
+      // try {
+      //   import("@/lib/firebaseClient").then(async (m) => {
+      //     const getIdToken = m.getIdToken as () => Promise<string | null>;
+      //     const token = await getIdToken();
+      //     if (!token) return;
+      //     const projectKey = `cipherstudio:project:${meta.id}`;
+      //     const raw = localStorage.getItem(projectKey);
+      //     if (!raw) return;
+      //     const payload = JSON.parse(raw);
+      //     fetch("/api/upstash/push", {
+      //       method: "POST",
+      //       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      //       body: JSON.stringify({ files: payload.files, projectId: meta.id }),
+      //     }).catch(() => {});
+      //   });
+      // } catch (e) {}
     }
   }
 

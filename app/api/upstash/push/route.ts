@@ -33,22 +33,21 @@ export async function POST(req: Request) {
     return new Response(JSON.stringify({ error: 'invalid token', detail: e?.message ?? String(e) }), { status: 401, headers: { 'Content-Type': 'application/json' } });
   }
   if (body.files && typeof body.files === "object") {
+    // Only allow authenticated users to push project snapshots to Redis.
+    // We require a verified UID and store the snapshot under a user-scoped key only.
     const projectId = body.projectId;
-    const owner = body.owner || undefined;
+    if (!uid) {
+      return new Response(JSON.stringify({ error: "authentication required" }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+    }
     const payload = {
       files: body.files,
       savedAt: new Date().toISOString(),
-      owner: owner || null,
-      pushedBy: uid || null,
+      pushedBy: uid,
     };
-    const keyProject = `project:${projectId}`;
+    const keyUser = `user:${uid}:project:${projectId}`;
     try {
-      await upstash.set(keyProject, payload);
-      if (owner) {
-        const keyUser = `user:${owner}:project:${projectId}`;
-        await upstash.set(keyUser, payload);
-      }
-      return new Response(JSON.stringify({ ok: true, key: keyProject, pushedBy: uid, payload }), { status: 200, headers: { "Content-Type": "application/json" } });
+      await upstash.set(keyUser, payload);
+      return new Response(JSON.stringify({ ok: true, key: keyUser, pushedBy: uid, payload }), { status: 200, headers: { "Content-Type": "application/json" } });
     } catch (e: any) {
       return new Response(JSON.stringify({ error: e?.message ?? String(e) }), { status: 500, headers: { "Content-Type": "application/json" } });
     }

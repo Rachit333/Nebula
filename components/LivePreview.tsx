@@ -1,7 +1,10 @@
 "use client";
-import { SandpackProvider, SandpackLayout, SandpackPreview } from "@codesandbox/sandpack-react";
+import {
+  SandpackProvider,
+  SandpackLayout,
+  SandpackPreview,
+} from "@codesandbox/sandpack-react";
 import { useProjectStore } from "@/hooks/useProjectStore";
-import ConsolePanel from "./ConsolePanel";
 
 export default function LivePreview() {
   const files = useProjectStore((s) => s.files);
@@ -18,7 +21,7 @@ export default function LivePreview() {
   });
   if (unsaved) {
     Object.entries(unsaved).forEach(([p, content]) => {
-      if (files[p] !== undefined) return; 
+      if (files[p] !== undefined) return;
       const effective = content;
       if (p.startsWith("/src/")) {
         const target = `/${p.slice("/src/".length)}`;
@@ -30,14 +33,23 @@ export default function LivePreview() {
   }
 
   if (!sandpackFiles["/index.js"]) {
-    sandpackFiles["/index.js"] = `import ReactDOM from \"react-dom/client\";\nimport App from \"./App\";\nconst root = ReactDOM.createRoot(document.getElementById(\"root\"));\nroot.render(<App />);`;
+    sandpackFiles[
+      "/index.js"
+    ] = `import ReactDOM from \"react-dom/client\";\nimport App from \"./App\";\nconst root = ReactDOM.createRoot(document.getElementById(\"root\"));\nroot.render(<App />);`;
   }
 
   if (!sandpackFiles["/App.js"]) {
     sandpackFiles["/App.js"] = `export default function App(){ return null }`;
   }
-  const keyParts = Object.entries(sandpackFiles).map(([k, v]) => `${k}:${v?.length ?? 0}`).sort().join("|");
-  console.log("LivePreview sandpackFiles", Object.keys(sandpackFiles), keyParts);
+  const keyParts = Object.entries(sandpackFiles)
+    .map(([k, v]) => `${k}:${v?.length ?? 0}`)
+    .sort()
+    .join("|");
+  console.log(
+    "LivePreview sandpackFiles",
+    Object.keys(sandpackFiles),
+    keyParts
+  );
 
   return (
     <SandpackProvider key={keyParts} template="react" files={sandpackFiles}>
@@ -50,10 +62,8 @@ export default function LivePreview() {
               showOpenInCodeSandbox={false}
             />
           </div>
-          <ConsolePanel />
         </div>
       </SandpackLayout>
     </SandpackProvider>
   );
 }
-

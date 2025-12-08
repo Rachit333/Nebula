@@ -9,6 +9,7 @@ interface FileState {
   setFile: (path: string, content: string) => void;
   deleteFile: (path: string) => void;
   renameFile: (oldPath: string, newPath: string) => void;
+  renameFolder: (oldPath: string, newPath: string) => void;
   autosave: boolean;
   setAutosave: (v: boolean) => void;
   unsaved: FileMap;
@@ -23,24 +24,17 @@ interface FileState {
 
 export const useProjectStore = create<FileState>((set) => {
   const tag = "useProjectStore";
-  console.log(tag, "init", new Date().toISOString());
-  const d = (...args: any[]) => {
-    try {
-      console.debug(tag, new Date().toISOString(), ...args);
-    } catch {}
-  };
+  // Disable console output from this module for now
+  try {
+    (console as any).log = () => {};
+    (console as any).debug = () => {};
+    (console as any).info = () => {};
+    (console as any).error = () => {};
+  } catch (err) {}
 
-  const i = (...args: any[]) => {
-    try {
-      console.info(tag, new Date().toISOString(), ...args);
-    } catch {}
-  };
-
-  const e = (...args: any[]) => {
-    try {
-      console.error(tag, new Date().toISOString(), ...args);
-    } catch {}
-  };
+  const d = (..._args: any[]) => {};
+  const i = (..._args: any[]) => {};
+  const e = (..._args: any[]) => {};
 
   const safeSetLocal = (key: string, value: string) => {
     try {
@@ -140,11 +134,9 @@ root.render(<App />);`,
         try {
           if (s.autosave) {
             const projectId = s.currentProjectId;
-            const auth = getAuthInstance();
-            const owner = auth.currentUser?.displayName || auth.currentUser?.email || auth.currentUser?.uid;
-            const payload = { files: { ...nextFiles }, projectId, owner };
-            d("autosave enabled; queuing push", projectId, owner);
-            console.log(tag, "setFile autosave queue", projectId, owner);
+            const payload = { files: { ...nextFiles }, projectId };
+            d("autosave enabled; queuing push", projectId);
+            console.log(tag, "setFile autosave queue", projectId);
             void pushToServer(payload);
           }
         } catch (err) {
@@ -167,7 +159,25 @@ root.render(<App />);`,
         copy[newPath] = copy[oldPath] ?? "";
         delete copy[oldPath];
         d("renameFile", oldPath, newPath);
-        console.log(tag, "renameFile", oldPath, newPath);
+        return { files: copy };
+      }),
+    renameFolder: (oldPath: string, newPath: string) =>
+      set((s) => {
+        const copy = { ...s.files };
+        // Normalize paths (no trailing slash on folder path)
+        const oldPrefix = oldPath.replace(/\/+$/g, "");
+        const newPrefix = newPath.replace(/\/+$/g, "");
+
+        Object.keys(s.files).forEach((p) => {
+          if (p === oldPrefix || p.startsWith(oldPrefix + "/")) {
+            const remainder = p === oldPrefix ? "" : p.substring(oldPrefix.length + 1);
+            const newKey = remainder ? `${newPrefix}/${remainder}` : newPrefix;
+            copy[newKey] = copy[p];
+            delete copy[p];
+          }
+        });
+
+        d("renameFolder", oldPath, newPath);
         return { files: copy };
       }),
     setAutosave: (v: boolean) =>
@@ -223,15 +233,13 @@ root.render(<App />);`,
           }
           delete copyUnsaved[path];
           try {
-            if (s.autosave || pushToRedis) {
-              const projectId = s.currentProjectId;
-              const fullProject = { ...copyFiles };
-              fullProject[path] = toWrite;
-              const auth = getAuthInstance();
-              const owner = auth.currentUser?.displayName || auth.currentUser?.email || auth.currentUser?.uid;
-              d("commitUnsaved will push", { projectId, owner, path });
-              console.log(tag, "commitUnsaved will push", projectId, owner, path);
-              void pushToServer({ files: fullProject, projectId, owner });
+              if (s.autosave || pushToRedis) {
+                const projectId = s.currentProjectId;
+                const fullProject = { ...copyFiles };
+                fullProject[path] = toWrite;
+                d("commitUnsaved will push", { projectId, path });
+                console.log(tag, "commitUnsaved will push", projectId, path);
+                void pushToServer({ files: fullProject, projectId });
             }
           } catch (err) {
             e("commitUnsaved push error", String(err));
@@ -284,11 +292,9 @@ root.render(<App />);`,
               console.log(tag, "pushProject local persist error", p, String(err));
             }
           });
-          const auth = getAuthInstance();
-          const ownerToSend = auth.currentUser?.displayName || auth.currentUser?.email || auth.currentUser?.uid || finalOwner;
-          d("pushProject preparing payload", { pid, ownerToSend });
-          console.log(tag, "pushProject preparing payload", pid, ownerToSend);
-          void pushToServer({ files: s.files, projectId: pid, owner: ownerToSend });
+          d("pushProject preparing payload", { pid });
+          console.log(tag, "pushProject preparing payload", pid);
+          void pushToServer({ files: s.files, projectId: pid });
         } catch (err) {
           e("pushProject error", String(err));
           console.log(tag, "pushProject error", String(err));
@@ -345,8 +351,16 @@ root.render(<App />);`,
 
           (async () => {
             try {
-              const resp = await fetch(`/api/upstash/push?key=project:${encodeURIComponent(projectId)}`);
-              if (resp.ok) {
+              const auth = getAuthInstance();
+              const uid = auth.currentUser?.uid;
+              let resp: Response | null = null;
+              if (uid) {
+                resp = await fetch(`/api/upstash/push?key=user:${encodeURIComponent(uid)}:project:${encodeURIComponent(projectId)}`);
+              }
+              if (!resp || !resp.ok) {
+                resp = await fetch(`/api/upstash/push?key=project:${encodeURIComponent(projectId)}`);
+              }
+              if (resp && resp.ok) {
                 const json = await resp.json();
                 const remote = json?.value ?? null;
                 if (remote && remote.files) {
@@ -372,7 +386,7 @@ root.render(<App />);`,
                     } else if (localTime > remoteTime) {
                       d("loadProject: local newer, pushing to remote", projectId);
                       console.log(tag, "loadProject local newer, pushing to remote", projectId);
-                      await pushToServer({ files: s.files, projectId, owner: undefined });
+                      await pushToServer({ files: s.files, projectId });
                       return;
                     }
                   }
