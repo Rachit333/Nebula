@@ -1,0 +1,39 @@
+
+> cipherstudio@0.1.0 build
+> next build
+
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+   ▲ Next.js 15.5.7
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 16.6s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/9) ...
+   Generating static pages (2/9) 
+   Generating static pages (4/9) 
+   Generating static pages (6/9) 
+ ✓ Generating static pages (9/9)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    17.2 kB         119 kB
+├ ○ /_not-found                            990 B         103 kB
+├ ƒ /api/ai/generate                       127 B         102 kB
+├ ƒ /api/upstash/push                      127 B         102 kB
+├ ○ /login                               2.28 kB         140 kB
+└ ○ /studio                              1.28 kB         103 kB
++ First Load JS shared by all             102 kB
+  ├ chunks/616-5d6f03277e629502.js       45.7 kB
+  ├ chunks/cba12914-b60b4cb27b54e640.js  54.2 kB
+  └ other shared chunks (total)          2.26 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
