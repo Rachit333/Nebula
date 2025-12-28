@@ -8,7 +8,6 @@ export default function CodeEditor({ selectedPath }: { selectedPath?: string }) 
   const files = useProjectStore((s) => s.files);
   const unsaved = useProjectStore((s) => s.unsaved);
   const setFile = useProjectStore((s) => s.setFile);
-  const autosave = useProjectStore((s) => s.autosave);
   const setUnsaved = useProjectStore((s) => s.setUnsaved);
   const { theme } = useTheme();
   const code = selectedPath
@@ -33,11 +32,8 @@ export default function CodeEditor({ selectedPath }: { selectedPath?: string }) 
     timeoutRef.current = window.setTimeout(() => {
       const contentToStore = isJsxLike(selectedPath) ? fixJsxComments(next) : next;
       if (!selectedPath) return;
-      if (autosave) {
-        setFile(selectedPath, contentToStore);
-      } else {
-        setUnsaved(selectedPath, contentToStore);
-      }
+      // Autosave always-on: write directly to files
+      setFile(selectedPath, contentToStore);
     }, 250) as unknown as number;
   }
 

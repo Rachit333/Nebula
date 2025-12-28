@@ -10,8 +10,6 @@ interface FileState {
   deleteFile: (path: string) => void;
   renameFile: (oldPath: string, newPath: string) => void;
   renameFolder: (oldPath: string, newPath: string) => void;
-  autosave: boolean;
-  setAutosave: (v: boolean) => void;
   unsaved: FileMap;
   setUnsaved: (path: string, content: string) => void;
   commitUnsaved: (path: string, pushToRedis?: boolean) => void;
@@ -24,17 +22,16 @@ interface FileState {
 
 export const useProjectStore = create<FileState>((set) => {
   const tag = "useProjectStore";
-  // Disable console output from this module for now
-  try {
-    (console as any).log = () => {};
-    (console as any).debug = () => {};
-    (console as any).info = () => {};
-    (console as any).error = () => {};
-  } catch (err) {}
 
-  const d = (..._args: any[]) => {};
-  const i = (..._args: any[]) => {};
-  const e = (..._args: any[]) => {};
+  const d = (..._args: any[]) => {
+    console.log(tag, ..._args);
+  };
+  const i = (..._args: any[]) => {
+    console.log(tag, ..._args);
+  };
+  const e = (..._args: any[]) => {
+    console.error(tag, ..._args);
+  };
 
   const safeSetLocal = (key: string, value: string) => {
     try {
@@ -108,7 +105,6 @@ root.render(<App />);`,
   }
 }`,
     },
-    autosave: true,
     unsaved: {},
     currentProjectId: undefined,
     setFile: (path: string, content: string) =>
@@ -132,16 +128,17 @@ root.render(<App />);`,
           console.log(tag, "setFile localStorage error", p, String(err));
         }
         try {
-          if (s.autosave) {
-            const projectId = s.currentProjectId;
+          // Autosave is always-on: if we have a currentProjectId, push changes to server in background
+          const projectId = s.currentProjectId;
+          if (projectId) {
             const payload = { files: { ...nextFiles }, projectId };
-            d("autosave enabled; queuing push", projectId);
+            d("autosave (always-on) queued push", projectId);
             console.log(tag, "setFile autosave queue", projectId);
             void pushToServer(payload);
           }
         } catch (err) {
-          e("setFile autosave push error", String(err));
-          console.log(tag, "setFile autosave push error", String(err));
+          e("setFile push error", String(err));
+          console.log(tag, "setFile push error", String(err));
         }
         return { files: nextFiles };
       }),
@@ -180,22 +177,6 @@ root.render(<App />);`,
         d("renameFolder", oldPath, newPath);
         return { files: copy };
       }),
-    setAutosave: (v: boolean) =>
-      set((s) => {
-        try {
-          if (v) {
-            const payload = { key: s.currentProjectId, value: s.files };
-            d("enabling autosave; triggering initial push attempt", payload);
-            console.log(tag, "setAutosave enabling", s.currentProjectId);
-            void pushToServer({ files: s.files, projectId: s.currentProjectId, owner: undefined });
-          }
-        } catch (err) {
-          e("setAutosave error", String(err));
-          console.log(tag, "setAutosave error", String(err));
-        }
-        console.log(tag, "setAutosave result", v);
-        return { autosave: v };
-      }),
     setUnsaved: (path: string, content: string) =>
       set((s) => {
         const next = { ...(s.unsaved || {}), [path]: content };
@@ -233,13 +214,14 @@ root.render(<App />);`,
           }
           delete copyUnsaved[path];
           try {
-              if (s.autosave || pushToRedis) {
-                const projectId = s.currentProjectId;
-                const fullProject = { ...copyFiles };
-                fullProject[path] = toWrite;
-                d("commitUnsaved will push", { projectId, path });
-                console.log(tag, "commitUnsaved will push", projectId, path);
-                void pushToServer({ files: fullProject, projectId });
+            // Autosave always-on: push if we have a currentProjectId or explicit push requested
+            if (s.currentProjectId || pushToRedis) {
+              const projectId = s.currentProjectId;
+              const fullProject = { ...copyFiles };
+              fullProject[path] = toWrite;
+              d("commitUnsaved will push", { projectId, path });
+              console.log(tag, "commitUnsaved will push", projectId, path);
+              void pushToServer({ files: fullProject, projectId });
             }
           } catch (err) {
             e("commitUnsaved push error", String(err));
@@ -266,7 +248,7 @@ root.render(<App />);`,
         try {
           if (!projectId) throw new Error("projectId required");
           const key = `cipherstudio:project:${projectId}`;
-          const payload = { files: s.files, autosave: s.autosave, unsaved: s.unsaved, savedAt: new Date().toISOString() };
+          const payload = { files: s.files, unsaved: s.unsaved, savedAt: new Date().toISOString() };
           safeSetLocal(key, JSON.stringify(payload));
           s.currentProjectId = projectId;
           i("saveProject ok", projectId);
@@ -309,14 +291,19 @@ root.render(<App />);`,
           const localKey = `cipherstudio:project:${projectId}`;
           const rawLocal = localStorage.getItem(localKey);
           let localParsed: any = null;
+          
+          // Try to get from project snapshot first
           if (rawLocal) {
             try {
               localParsed = JSON.parse(rawLocal);
-              console.log(tag, "loadProject found local snapshot", projectId, Object.keys(localParsed.files || {}).length);
+              console.log(tag, "✅ loadProject found local snapshot", projectId, Object.keys(localParsed.files || {}).length);
             } catch (parseErr) {
-              console.log(tag, "loadProject local parse error", projectId, String(parseErr));
+              console.log(tag, "❌ loadProject local parse error", projectId, String(parseErr));
             }
-          } else {
+          }
+          
+          // If no snapshot, try to reconstruct from individual files
+          if (!localParsed) {
             try {
               const reconstructed: Record<string, string> = {};
               for (let i = 0; i < localStorage.length; i++) {
@@ -333,84 +320,76 @@ root.render(<App />);`,
                 }
               }
               if (Object.keys(reconstructed).length > 0) {
-                localParsed = { files: reconstructed, autosave: s.autosave, unsaved: {} };
+                localParsed = { files: reconstructed, unsaved: {} };
                 try {
                   safeSetLocal(localKey, JSON.stringify(localParsed));
-                  console.log(tag, "loadProject reconstructed and saved snapshot", projectId, Object.keys(reconstructed).length);
+                  console.log(tag, "✅ loadProject reconstructed and saved snapshot", projectId, Object.keys(reconstructed).length);
                 } catch (saveErr) {
-                  console.log(tag, "loadProject reconstruct save error", String(saveErr));
+                  console.log(tag, "⚠️  loadProject reconstruct save error", String(saveErr));
                 }
               } else {
-                console.log(tag, "loadProject found no local files to reconstruct", projectId);
+                console.log(tag, "⚠️  loadProject found no local files to reconstruct", projectId);
               }
             } catch (err) {
-              d("reconstruct project from files failed", String(err));
-              console.log(tag, "loadProject reconstruct failed", String(err));
+              console.log(tag, "❌ loadProject reconstruct failed", String(err));
             }
           }
 
-          (async () => {
-            try {
-              const auth = getAuthInstance();
-              const uid = auth.currentUser?.uid;
-              let resp: Response | null = null;
-              if (uid) {
-                resp = await fetch(`/api/upstash/push?key=user:${encodeURIComponent(uid)}:project:${encodeURIComponent(projectId)}`);
-              }
-              if (!resp || !resp.ok) {
-                resp = await fetch(`/api/upstash/push?key=project:${encodeURIComponent(projectId)}`);
-              }
-              if (resp && resp.ok) {
-                const json = await resp.json();
-                const remote = json?.value ?? null;
-                if (remote && remote.files) {
-                  const remoteSaved = remote.savedAt || remote.payload?.savedAt || remote.savedAt;
-                  const localSaved = localParsed?.savedAt;
-                  console.log(tag, "loadProject remote fetched", projectId, Object.keys(remote.files || {}).length, "remoteSaved", remoteSaved, "localSaved", localSaved);
-                  if (!localSaved && remoteSaved) {
-                    safeSetLocal(localKey, JSON.stringify(remote));
-                    set({ files: remote.files, autosave: s.autosave, unsaved: {}, currentProjectId: projectId });
-                    i("loadProject: remote newer, loaded remote", projectId, remoteSaved);
-                    console.log(tag, "loadProject loaded remote because no localSaved", projectId, remoteSaved);
-                    return;
-                  }
-                  if (localSaved && remoteSaved) {
-                    const localTime = new Date(localSaved).getTime();
-                    const remoteTime = new Date(remoteSaved).getTime();
-                    if (remoteTime > localTime) {
+          // Load from localStorage immediately
+          if (localParsed) {
+            const files = localParsed.files ?? s.files;
+            const unsaved = localParsed.unsaved ?? {};
+            console.log(tag, "✅ loadProject returning local snapshot", projectId, Object.keys(files || {}).length, "files");
+            
+            // Now try to sync with remote in the background (non-blocking)
+            (async () => {
+              try {
+                const auth = getAuthInstance();
+                const uid = auth.currentUser?.uid;
+                let resp: Response | null = null;
+                if (uid) {
+                  resp = await fetch(`/api/upstash/push?key=user:${encodeURIComponent(uid)}:project:${encodeURIComponent(projectId)}`);
+                }
+                if (!resp || !resp.ok) {
+                  resp = await fetch(`/api/upstash/push?key=project:${encodeURIComponent(projectId)}`);
+                }
+                if (resp && resp.ok) {
+                  const json = await resp.json();
+                  const remote = json?.value ?? null;
+                  if (remote && remote.files) {
+                    const remoteSaved = remote.savedAt || remote.payload?.savedAt;
+                    const localSaved = localParsed?.savedAt;
+                    console.log(tag, "🔵 loadProject remote check", projectId, Object.keys(remote.files || {}).length, "remoteSaved:", remoteSaved, "localSaved:", localSaved);
+                    
+                    if (!localSaved && remoteSaved) {
                       safeSetLocal(localKey, JSON.stringify(remote));
-                      set({ files: remote.files, autosave: s.autosave, unsaved: {}, currentProjectId: projectId });
-                      i("loadProject: remote newer, synced remote", projectId);
-                      console.log(tag, "loadProject remote newer, applied remote", projectId);
-                      return;
-                    } else if (localTime > remoteTime) {
-                      d("loadProject: local newer, pushing to remote", projectId);
-                      console.log(tag, "loadProject local newer, pushing to remote", projectId);
-                      await pushToServer({ files: s.files, projectId });
-                      return;
+                      set((s2) => ({ ...s2, files: remote.files, unsaved: {}, currentProjectId: projectId }));
+                      console.log(tag, "✅ loadProject synced remote (no local save time)", projectId);
+                    } else if (localSaved && remoteSaved) {
+                      const localTime = new Date(localSaved).getTime();
+                      const remoteTime = new Date(remoteSaved).getTime();
+                      if (remoteTime > localTime) {
+                        safeSetLocal(localKey, JSON.stringify(remote));
+                        set((s2) => ({ ...s2, files: remote.files, unsaved: {}, currentProjectId: projectId }));
+                        console.log(tag, "✅ loadProject synced remote (remote is newer)", projectId);
+                      } else if (localTime > remoteTime) {
+                        console.log(tag, "ℹ️  loadProject local is newer, keeping local", projectId);
+                      }
                     }
                   }
                 }
+              } catch (err) {
+                console.log(tag, "⚠️  loadProject background remote check failed", String(err));
               }
-            } catch (err) {
-              e("loadProject remote fetch error", String(err));
-              console.log(tag, "loadProject remote fetch error", String(err));
-            }
-          })();
-
-          if (localParsed) {
-            const files = localParsed.files ?? s.files;
-            const autosave = localParsed.autosave ?? s.autosave;
-            const unsaved = localParsed.unsaved ?? {};
-            i("loadProject ok (local)", projectId);
-            console.log(tag, "loadProject returning local", projectId, Object.keys(files || {}).length);
-            return { files, autosave, unsaved, currentProjectId: projectId } as any;
+            })();
+            
+            return { files, unsaved, currentProjectId: projectId } as any;
           }
 
+          console.log(tag, "❌ loadProject found no data for", projectId);
           return s;
         } catch (err) {
-          e("loadProject error", String(err));
-          console.log(tag, "loadProject error", String(err));
+          console.error(tag, "loadProject error", String(err));
           return s;
         }
       }) as any,

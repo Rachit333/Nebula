@@ -526,7 +526,6 @@ export default function StudioClient() {
   const [showAIPanel, setShowAIPanel] = useState(false);
   const files = useProjectStore((s) => s.files);
   const setFile = useProjectStore((s) => s.setFile);
-  const autosave = useProjectStore((s) => s.autosave);
   const unsaved = useProjectStore((s) => s.unsaved);
   const commitUnsaved = useProjectStore((s) => s.commitUnsaved);
   const discardUnsaved = useProjectStore((s) => s.discardUnsaved);
@@ -604,23 +603,50 @@ root.render(<App />);`;
   }, [files, activeFile]);
 
   const search = useSearchParams();
+  
+  // Load project from URL param - prioritize this over defaults
   useEffect(() => {
     const projectId = search.get("project");
-    if (!projectId) return;
-    try {
-      const loaded = useProjectStore.getState().loadProject(projectId);
-      if (loaded) {
-        useProjectStore.getState().saveProject(projectId);
+    
+    // Project loading takes priority
+    if (projectId) {
+      console.log("🔵 [Studio] Loading project from URL:", projectId);
+      try {
+        const loaded = useProjectStore.getState().loadProject(projectId);
+        if (loaded) {
+          console.log("✅ [Studio] Project loaded successfully:", projectId);
+          useProjectStore.getState().saveProject(projectId);
+        } else {
+          console.warn("⚠️  [Studio] Project load returned false:", projectId);
+        }
+      } catch (err) {
+        console.error("❌ [Studio] Failed to load project:", projectId, err);
       }
-    } catch (err) {
-      console.error("Failed to load project", projectId, err);
+      // Don't initialize with defaults when we have a project ID
+      setInitialized(true);
+      
+      // Trigger initial animation after a short delay
+      setTimeout(() => {
+        handleProgrammaticResize(60);
+        setTimeout(() => {
+          setIsInitialLoad(false);
+        }, 1100);
+      }, 100);
     }
   }, [search]);
 
-  // Initialize with default files if empty
+  // Initialize with default files only if no project is being loaded
   useEffect(() => {
+    // Only initialize defaults if we don't have a projectId in the URL
+    const projectId = search.get("project");
+    if (projectId) {
+      // Project is being loaded via the other effect, don't interfere
+      return;
+    }
+    
     const currentFiles = useProjectStore.getState().files;
     if (Object.keys(currentFiles).length === 0) {
+      console.log("🔵 [Studio] Initializing with default files");
       Object.entries(FILE_CONTENTS).forEach(([path, content]) => {
         useProjectStore.getState().setFile(path, content);
       });
@@ -634,7 +660,33 @@ root.render(<App />);`;
         setIsInitialLoad(false);
       }, 1100);
     }, 100);
-  }, []);
+  }, [search]);
+
+  // Auto-save project to localStorage (debounced) - always enabled
+  useEffect(() => {
+    const currentProjectId = useProjectStore.getState().currentProjectId;
+    if (!currentProjectId || !files || Object.keys(files).length === 0) {
+      return;
+    }
+
+    // Debounce auto-save - wait 2 seconds after last change
+    const saveTimer = setTimeout(() => {
+      try {
+        const localKey = `cipherstudio:project:${currentProjectId}`;
+        const payload = {
+          files,
+          unsaved: {},
+          savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(localKey, JSON.stringify(payload));
+        console.log("💾 [Studio] Auto-saved project to localStorage:", currentProjectId);
+      } catch (err) {
+        console.error("❌ [Studio] Auto-save failed:", err);
+      }
+    }, 2000);
+
+    return () => clearTimeout(saveTimer);
+  }, [files]);
 
   // Add global CSS to handle iframe pointer events during resize
   useEffect(() => {
@@ -964,10 +1016,8 @@ root.render(<App />);`;
                 onSelect={(p) => setActiveFile(p)}
                 onClose={(p) => {
                   const hasUnsaved = !!unsaved?.[p];
-                  if (!autosave && hasUnsaved) {
-                    if (!confirm(`Discard unsaved changes to ${p}?`)) return;
-                    discardUnsaved(p);
-                  } else if (autosave && hasUnsaved) {
+                  // Always auto-commit unsaved changes
+                  if (hasUnsaved) {
                     commitUnsaved(p);
                   }
                   setOpenTabs((t) => t.filter((x) => x !== p));

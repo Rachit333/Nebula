@@ -7,14 +7,11 @@ import {
   ChevronDown,
   ChevronRight,
   Folder,
-  File,
   FilePlus,
   FolderPlus,
-  Save,
   Settings,
   Download,
   Upload,
-  MoreVertical,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -26,19 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogClose,
@@ -549,13 +533,11 @@ export default function Toolbar({
 }) {
   const files = useProjectStore((s) => s.files);
   const tree = React.useMemo(() => buildTree(files), [files]);
-  const autosave = useProjectStore((s) => s.autosave);
-  const setAutosave = useProjectStore((s) => s.setAutosave);
   const unsaved = useProjectStore((s) => s.unsaved);
-  const commitUnsaved = useProjectStore((s) => s.commitUnsaved);
-  const hasUnsaved = activeFile ? !!unsaved?.[activeFile] : false;
-  const [showNewFileDialog, setShowNewFileDialog] = React.useState(false);
-  const [showNewFolderDialog, setShowNewFolderDialog] = React.useState(false);
+  // const commitUnsaved = useProjectStore((s) => s.commitUnsaved);
+  // const hasUnsaved = activeFile ? !!unsaved?.[activeFile] : false;
+  // const [showNewFileDialog, setShowNewFileDialog] = React.useState(false);
+  // const [showNewFolderDialog, setShowNewFolderDialog] = React.useState(false);
 
   return (
     <TooltipProvider>
@@ -571,48 +553,7 @@ export default function Toolbar({
           </div>
         </div>
 
-        {/* Quick Actions Bar */}
-        {activeFile && (
-          <div className="p-2 border-b border-border bg-muted/20 flex items-center gap-2">
-            <div className="flex items-center gap-1 flex-1">
-              <Checkbox
-                id="autosave-check"
-                checked={!!autosave}
-                onCheckedChange={(checked) => setAutosave(!!checked)}
-                className="h-4 w-4"
-              />
-              <label
-                htmlFor="autosave-check"
-                className="text-xs cursor-pointer select-none"
-              >
-                Autosave
-              </label>
-            </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="sm"
-                  variant={hasUnsaved ? "default" : "ghost"}
-                  disabled={!hasUnsaved}
-                  onClick={() => {
-                    if (activeFile) {
-                      commitUnsaved(activeFile, true);
-                      toast.success("File saved", {
-                        description:
-                          "Your changes have been saved successfully.",
-                      });
-                    }
-                  }}
-                  className="h-7 px-2"
-                >
-                  <Save className="w-3.5 h-3.5 mr-1" />
-                  Save
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Save current file</TooltipContent>
-            </Tooltip>
-          </div>
-        )}
+        {/* Quick Actions Bar removed — autosave runs automatically */}
 
         {/* File Tree */}
         <ScrollArea className="flex-1">
