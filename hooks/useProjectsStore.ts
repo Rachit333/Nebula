@@ -33,7 +33,7 @@ type ProjectsState = {
   refresh: () => void;
 };
 
-const INDEX_KEY = "cipherstudio:projects";
+const INDEX_KEY = "nebula:projects";
 
 function readIndex(): ProjectMeta[] {
   try {
@@ -74,13 +74,13 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     writeIndex(next);
 
     try {
-      const projectKey = `cipherstudio:project:${id}`;
+      const projectKey = `nebula:project:${id}`;
       const defaultPayload = {
         files: {
-          "/src/App.js": `export default function App() {\n  return <h1>Hello CipherStudio 👋</h1>;\n}`,
+          "/src/App.js": `export default function App() {\n  return <h1>Hello nebula 👋</h1>;\n}`,
           "/src/index.js": `import ReactDOM from \"react-dom/client\";\nimport App from \"./App\";\nconst root = ReactDOM.createRoot(document.getElementById(\"root\"));\nroot.render(<App />);`,
           "/src/index.css": `body { font-family: Arial, Helvetica, sans-serif; }`,
-          "/public/index.html": `<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"utf-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <title>CipherStudio App</title>\n  </head>\n  <body>\n    <div id=\"root\"></div>\n  </body>\n</html>`,
+          "/public/index.html": `<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"utf-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <title>nebula App</title>\n  </head>\n  <body>\n    <div id=\"root\"></div>\n  </body>\n</html>`,
           "/package.json": `{\n  "name": "my-app",\n  "private": true,\n  "dependencies": {\n    "react": "^18.0.0",\n    "react-dom": "^18.0.0"\n  }\n}`,
         },
         autosave: false,
@@ -97,7 +97,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     const next = get().projects.filter((p) => p.id !== id);
     writeIndex(next);
     try {
-      localStorage.removeItem(`cipherstudio:project:${id}`);
+      localStorage.removeItem(`nebula:project:${id}`);
     } catch (e) {}
     set({ projects: next });
   },

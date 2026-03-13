@@ -78,7 +78,7 @@ export const useProjectStore = create<FileState>((set) => {
   return ({
     files: {
       "/src/App.js": `export default function App() {
-  return <h1>Hello CipherStudio 👋</h1>;
+  return <h1>Hello nebula 👋</h1>;
 }`,
       "/src/index.js": `import ReactDOM from "react-dom/client";
 import App from "./App";
@@ -90,7 +90,7 @@ root.render(<App />);`,
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>CipherStudio App</title>
+    <title>nebula App</title>
   </head>
   <body>
     <div id="root"></div>
@@ -121,7 +121,7 @@ root.render(<App />);`,
         const nextFiles = { ...s.files, [p]: content };
         console.log(tag, "setFile", p, content?.slice?.(0, 120));
         try {
-          const key = `cipherstudio:file:${encodeURIComponent(p)}`;
+          const key = `nebula:file:${encodeURIComponent(p)}`;
           safeSetLocal(key, content);
         } catch (err) {
           e("setFile localStorage error", p, String(err));
@@ -181,7 +181,7 @@ root.render(<App />);`,
       set((s) => {
         const next = { ...(s.unsaved || {}), [path]: content };
         try {
-          const key = `cipherstudio:file:${encodeURIComponent(path)}`;
+          const key = `nebula:file:${encodeURIComponent(path)}`;
           safeSetLocal(key, content);
         } catch (err) {
           e("setUnsaved localStorage error", path, String(err));
@@ -206,7 +206,7 @@ root.render(<App />);`,
           }
           copyFiles[path] = toWrite;
           try {
-            const key = `cipherstudio:file:${encodeURIComponent(path)}`;
+            const key = `nebula:file:${encodeURIComponent(path)}`;
             safeSetLocal(key, toWrite);
           } catch (err) {
             e("commitUnsaved localStorage error", path, String(err));
@@ -247,7 +247,7 @@ root.render(<App />);`,
       set((s) => {
         try {
           if (!projectId) throw new Error("projectId required");
-          const key = `cipherstudio:project:${projectId}`;
+          const key = `nebula:project:${projectId}`;
           const payload = { files: s.files, unsaved: s.unsaved, savedAt: new Date().toISOString() };
           safeSetLocal(key, JSON.stringify(payload));
           s.currentProjectId = projectId;
@@ -266,7 +266,7 @@ root.render(<App />);`,
           const finalOwner = owner || 'rick morty';
           Object.entries(s.files).forEach(([p, content]) => {
             try {
-              const key = `cipherstudio:file:${encodeURIComponent(p)}`;
+              const key = `nebula:file:${encodeURIComponent(p)}`;
               safeSetLocal(key, content);
               console.log(tag, "pushProject persisted file", p);
             } catch (err) {
@@ -288,7 +288,7 @@ root.render(<App />);`,
         try {
           if (!projectId) return s;
           console.log(tag, "loadProject start", projectId);
-          const localKey = `cipherstudio:project:${projectId}`;
+          const localKey = `nebula:project:${projectId}`;
           const rawLocal = localStorage.getItem(localKey);
           let localParsed: any = null;
           
@@ -309,9 +309,9 @@ root.render(<App />);`,
               for (let i = 0; i < localStorage.length; i++) {
                 const k = localStorage.key(i) as string;
                 if (!k) continue;
-                if (k.startsWith("cipherstudio:file:")) {
+                if (k.startsWith("nebula:file:")) {
                   try {
-                    const p = decodeURIComponent(k.replace("cipherstudio:file:", ""));
+                    const p = decodeURIComponent(k.replace("nebula:file:", ""));
                     const v = localStorage.getItem(k);
                     if (v !== null) reconstructed[p] = v;
                   } catch (e) {
@@ -399,8 +399,8 @@ root.render(<App />);`,
         const res: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i) as string;
-          if (key?.startsWith("cipherstudio:project:")) {
-            res.push(key.replace("cipherstudio:project:", ""));
+          if (key?.startsWith("nebula:project:")) {
+            res.push(key.replace("nebula:project:", ""));
           }
         }
         d("listProjects", res.length);

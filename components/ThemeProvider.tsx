@@ -11,21 +11,25 @@ type ThemeContextType = {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+const STORAGE_KEY = "nebula:theme";
+
 export const ThemeProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }) => {
   const [theme, setThemeState] = useState<Theme>(() => {
     try {
-      const stored = localStorage.getItem("cipherstudio:theme");
+      const stored = localStorage.getItem(STORAGE_KEY);
       if (stored === "dark" || stored === "light") return stored;
+      if (window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
     } catch {}
-    return "light";
+    return "dark"; // Nebula defaults to dark
   });
 
   useEffect(() => {
     try {
-      localStorage.setItem("cipherstudio:theme", theme);
+      localStorage.setItem(STORAGE_KEY, theme);
     } catch {}
     const root = document.documentElement;
-    if (theme === "dark") root.classList.add("dark"); else root.classList.remove("dark");
+    if (theme === "dark") root.classList.add("dark");
+    else root.classList.remove("dark");
   }, [theme]);
 
   const setTheme = (t: Theme) => setThemeState(t);

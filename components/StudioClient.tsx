@@ -1,472 +1,5 @@
-// "use client";
-// import React, { useRef, useState, useEffect } from "react";
-// import type ReactType from "react";
-
-// import CodeEditor from "@/components/CodeEditor";
-// import LivePreview from "@/components/LivePreview";
-// import ModernDrawer from "@/components/ModernDrawer";
-// import Toolbar from "@/components/Toolbar";
-// import { useProjectStore } from "@/hooks/useProjectStore";
-// import {
-//   X,
-//   Sun,
-//   MoonStar,
-//   FileText,
-//   Laptop,
-//   Smartphone,
-//   RotateCcw,
-// } from "lucide-react";
-// import { Button } from "@/components/ui/button";
-// import { useTheme } from "@/components/ThemeProvider";
-// import { useSearchParams } from "next/navigation";
-// import { SandpackProvider } from "@codesandbox/sandpack-react";
-// import {
-//   ResizableHandle,
-//   ResizablePanel,
-//   ResizablePanelGroup,
-// } from "@/components/ui/resizable";
-// import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-// import {
-//   Tooltip,
-//   TooltipContent,
-//   TooltipProvider,
-//   TooltipTrigger,
-// } from "@/components/ui/tooltip";
-
-// const FILES = [
-//   { name: "App.js", path: "/App.js" },
-//   { name: "index.js", path: "/index.js" },
-//   { name: "utils.js", path: "/utils.js" },
-// ];
-
-// const FILE_CONTENTS: Record<string, string> = {
-//   "/App.js": `export default function App() {
-//   console.log("Hello CipherStudio!");
-//   return <h1>Hello CipherStudio 👋</h1>;
-// }`,
-//   "/index.js": `import ReactDOM from "react-dom/client";
-// import App from "./App";
-// const root = ReactDOM.createRoot(document.getElementById("root"));
-// root.render(<App />);`,
-//   "/utils.js": `export function greet(name) {
-//   return "Hello " + name;
-// }`,
-// };
-
-// export default function StudioClient() {
-//   const containerRef = useRef<HTMLDivElement | null>(null);
-//   const [activeFile, setActiveFile] = useState<string>("");
-//   const files = useProjectStore((s) => s.files);
-//   const setFile = useProjectStore((s) => s.setFile);
-//   const autosave = useProjectStore((s) => s.autosave);
-//   const unsaved = useProjectStore((s) => s.unsaved);
-//   const commitUnsaved = useProjectStore((s) => s.commitUnsaved);
-//   const discardUnsaved = useProjectStore((s) => s.discardUnsaved);
-//   const [openTabs, setOpenTabs] = useState<string[]>([]);
-//   const { theme } = useTheme();
-//   const [initialized, setInitialized] = useState(false);
-//   const previewPanelRef = useRef<any>(null);
-
-//   // Memoize sandpack options to prevent re-renders
-//   const sandpackOptions = React.useMemo(
-//     () => ({
-//       externalResources: [],
-//       bundlerURL: undefined,
-//     }),
-//     []
-//   );
-
-//   // Process files for Sandpack - optimized to prevent unnecessary re-renders
-//   const sandpackFiles = React.useMemo(() => {
-//     const result: Record<string, string> = {};
-
-//     // Ensure we always have App.js and index.js with fallbacks
-//     result["/App.js"] =
-//       files["/App.js"] ||
-//       files["/src/App.js"] ||
-//       `export default function App() {
-//   console.log("Hello CipherStudio!");
-//   return <h1>Hello CipherStudio 👋</h1>;
-// }`;
-
-//     result["/index.js"] =
-//       files["/index.js"] ||
-//       `import ReactDOM from "react-dom/client";
-// import App from "./App";
-// const root = ReactDOM.createRoot(document.getElementById("root"));
-// root.render(<App />);`;
-
-//     // Add user files
-//     Object.entries(files).forEach(([p, content]) => {
-//       const effective = (unsaved && unsaved[p]) ?? content;
-//       if (p.startsWith("/src/")) {
-//         const target = `/${p.slice("/src/".length)}`;
-//         // Skip if we already handled these files
-//         if (target !== "/App.js" && target !== "/index.js") {
-//           result[target] = effective;
-//         }
-//       } else if (p !== "/App.js" && p !== "/index.js") {
-//         result[p] = effective;
-//       }
-//     });
-
-//     return result;
-//   }, [files, unsaved]);
-
-//   useEffect(() => {
-//     if (activeFile) return;
-//     const preferred = "/src/App.js";
-//     if (files[preferred]) {
-//       setActiveFile(preferred);
-//       setOpenTabs([preferred]);
-//     } else {
-//       const first = Object.keys(files)[0];
-//       if (first) {
-//         setActiveFile(first);
-//         setOpenTabs([first]);
-//       }
-//     }
-//   }, [files, activeFile]);
-
-//   const search = useSearchParams();
-//   useEffect(() => {
-//     const projectId = search.get("project");
-//     if (!projectId) return;
-//     try {
-//       const loaded = useProjectStore.getState().loadProject(projectId);
-//       if (loaded) {
-//         useProjectStore.getState().saveProject(projectId);
-//       }
-//     } catch (err) {
-//       console.error("Failed to load project", projectId, err);
-//     }
-//   }, [search]);
-
-//   // Initialize with default files if empty
-//   useEffect(() => {
-//     const currentFiles = useProjectStore.getState().files;
-//     if (Object.keys(currentFiles).length === 0) {
-//       Object.entries(FILE_CONTENTS).forEach(([path, content]) => {
-//         useProjectStore.getState().setFile(path, content);
-//       });
-//     }
-//     setInitialized(true);
-//   }, []);
-
-//   // Add global CSS to handle iframe pointer events during resize
-//   useEffect(() => {
-//     const style = document.createElement("style");
-//     style.id = "resize-handle-fix";
-//     style.textContent = `
-//       /* Disable pointer events on iframes and potentially problematic elements during resize */
-//       [data-panel-group-direction="horizontal"]:active iframe,
-//       [data-panel-group-direction="horizontal"]:active .sp-preview-iframe,
-//       [data-panel-group-direction="horizontal"]:active .cm-editor,
-//       body.is-resizing iframe,
-//       body.is-resizing .sp-preview-iframe,
-//       body.is-resizing .cm-editor {
-//         pointer-events: none !important;
-//       }
-
-//       /* Ensure resize handle is always on top and has proper cursor */
-//       [data-resize-handle] {
-//         z-index: 50;
-//         cursor: col-resize !important;
-//         touch-action: none;
-//       }
-
-//       /* Prevent text selection during resize */
-//       body.is-resizing {
-//         user-select: none !important;
-//         -webkit-user-select: none !important;
-//         cursor: col-resize !important;
-//       }
-//     `;
-//     document.head.appendChild(style);
-
-//     // Track mouse state globally
-//     let isDragging = false;
-
-//     const handleMouseDown = (e: MouseEvent) => {
-//       const target = e.target as HTMLElement;
-//       if (target.closest("[data-resize-handle]")) {
-//         isDragging = true;
-//         document.body.classList.add("is-resizing");
-//         document.body.style.cursor = "col-resize";
-//       }
-//     };
-
-//     const handleMouseMove = (e: MouseEvent) => {
-//       if (isDragging && e.buttons !== 1) {
-//         // Mouse button released but mousemove still firing
-//         isDragging = false;
-//         document.body.classList.remove("is-resizing");
-//         document.body.style.cursor = "";
-//       }
-//     };
-
-//     const handleMouseUp = () => {
-//       if (isDragging) {
-//         isDragging = false;
-//         document.body.classList.remove("is-resizing");
-//         document.body.style.cursor = "";
-//       }
-//     };
-
-//     document.addEventListener("mousedown", handleMouseDown, true);
-//     document.addEventListener("mousemove", handleMouseMove, true);
-//     document.addEventListener("mouseup", handleMouseUp, true);
-
-//     return () => {
-//       style.remove();
-//       document.removeEventListener("mousedown", handleMouseDown, true);
-//       document.removeEventListener("mousemove", handleMouseMove, true);
-//       document.removeEventListener("mouseup", handleMouseUp, true);
-//       document.body.classList.remove("is-resizing");
-//       document.body.style.cursor = "";
-//     };
-//   }, []);
-
-//   function TabBar({
-//     openTabs,
-//     active,
-//     onSelect,
-//     onClose,
-//   }: {
-//     openTabs: string[];
-//     active?: string;
-//     onSelect: (p: string) => void;
-//     onClose: (p: string) => void;
-//   }) {
-//     const { theme, toggleTheme } = useTheme();
-
-//     return (
-//       <TooltipProvider>
-//         <div className="flex items-center border-b border-border bg-muted/30 backdrop-blur-sm">
-//           <ScrollArea className="flex-1">
-//             <div className="flex items-center px-2 py-1.5 gap-1">
-//               {openTabs.map((p) => {
-//                 const name = p.split("/").pop() || p;
-//                 const hasUnsaved = !!unsaved?.[p];
-//                 const isActive = active === p;
-
-//                 return (
-//                   <div
-//                     key={p}
-//                     className={`
-//                       group relative flex items-center gap-2 px-3 py-2 rounded-md
-//                       transition-all duration-200 ease-in-out
-//                       ${
-//                         isActive
-//                           ? "bg-background shadow-sm border border-border"
-//                           : "hover:bg-muted"
-//                       }
-//                     `}
-//                   >
-//                     <Tooltip>
-//                       <TooltipTrigger asChild>
-//                         <button
-//                           onClick={() => onSelect(p)}
-//                           className="flex items-center gap-2 min-w-0 outline-none"
-//                         >
-//                           <FileText
-//                             className={`w-3.5 h-3.5 flex-shrink-0 ${
-//                               isActive
-//                                 ? "text-primary"
-//                                 : "text-muted-foreground"
-//                             }`}
-//                           />
-//                           <span
-//                             className={`text-sm truncate max-w-[120px] ${
-//                               isActive
-//                                 ? "font-medium text-foreground"
-//                                 : "text-muted-foreground"
-//                             }`}
-//                           >
-//                             {name}
-//                           </span>
-//                           {hasUnsaved && (
-//                             <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 flex-shrink-0 animate-pulse" />
-//                           )}
-//                         </button>
-//                       </TooltipTrigger>
-//                       <TooltipContent side="bottom" className="text-xs">
-//                         <p>{p}</p>
-//                         {hasUnsaved && (
-//                           <p className="text-yellow-500">Unsaved changes</p>
-//                         )}
-//                       </TooltipContent>
-//                     </Tooltip>
-
-//                     {openTabs.length > 1 && (
-//                       <Button
-//                         variant="ghost"
-//                         size="icon"
-//                         className={`
-//                           h-5 w-5 p-0 rounded-sm
-//                           opacity-0 group-hover:opacity-100
-//                           transition-opacity duration-200
-//                           hover:bg-muted-foreground/20
-//                           ${isActive ? "opacity-60" : ""}
-//                         `}
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           onClose(p);
-//                         }}
-//                       >
-//                         <X className="h-3.5 w-3.5" />
-//                       </Button>
-//                     )}
-//                   </div>
-//                 );
-//               })}
-//             </div>
-//             <ScrollBar orientation="horizontal" />
-//           </ScrollArea>
-
-//           <div className="flex items-center px-2 border-l border-border">
-//             <Tooltip>
-//               <TooltipTrigger asChild>
-//                 <Button
-//                   variant="ghost"
-//                   size="icon"
-//                   className="h-8 w-8"
-//                   onClick={() => toggleTheme()}
-//                 >
-//                   {theme === "dark" ? (
-//                     <Sun className="h-4 w-4" />
-//                   ) : (
-//                     <MoonStar className="h-4 w-4" />
-//                   )}
-//                 </Button>
-//               </TooltipTrigger>
-//               <TooltipContent side="bottom">
-//                 <p>Toggle theme</p>
-//               </TooltipContent>
-//             </Tooltip>
-//           </div>
-//         </div>
-//       </TooltipProvider>
-//     );
-//   }
-
-//   return (
-//     <SandpackProvider
-//       template="react"
-//       files={sandpackFiles}
-//       theme={theme === "dark" ? "dark" : "light"}
-//       options={sandpackOptions}
-//     >
-//       <main className="h-screen flex flex-col bg-background text-foreground">
-//         <div className="flex-1" ref={containerRef}>
-//           <div className="h-full flex">
-//             <Toolbar
-//               activeFile={activeFile}
-//               onOpen={(p: string) => {
-//                 setActiveFile(p);
-//                 setOpenTabs((tabs) => (tabs.includes(p) ? tabs : [...tabs, p]));
-//                 if (!files[p]) {
-//                   const content = FILE_CONTENTS[p] ?? "";
-//                   if (content) setFile(p, content);
-//                 }
-//               }}
-//               onRename={(oldP: string, newP: string) => {
-//                 useProjectStore.getState().renameFile(oldP, newP);
-//                 if (activeFile === oldP) setActiveFile(newP);
-//                 // Update open tabs to reflect the rename
-//                 setOpenTabs((tabs) => tabs.map((t) => (t === oldP ? newP : t)));
-//               }}
-//               onDelete={(p: string) => {
-//                 useProjectStore.getState().deleteFile(p);
-//                 // Close the tab if it's open
-//                 setOpenTabs((tabs) => tabs.filter((t) => t !== p));
-//                 if (activeFile === p) {
-//                   const remaining = openTabs.filter((t) => t !== p);
-//                   setActiveFile(remaining[0] ?? "");
-//                 }
-//               }}
-//             />
-//             <div className="flex-1 flex flex-col">
-//               <TabBar
-//                 openTabs={openTabs}
-//                 active={activeFile}
-//                 onSelect={(p) => setActiveFile(p)}
-//                 onClose={(p) => {
-//                   const hasUnsaved = !!unsaved?.[p];
-//                   if (!autosave && hasUnsaved) {
-//                     if (!confirm(`Discard unsaved changes to ${p}?`)) return;
-//                     discardUnsaved(p);
-//                   } else if (autosave && hasUnsaved) {
-//                     commitUnsaved(p);
-//                   }
-//                   setOpenTabs((t) => t.filter((x) => x !== p));
-//                   if (activeFile === p)
-//                     setActiveFile((t) => {
-//                       const next = openTabs.find((x) => x !== p);
-//                       return next ?? "";
-//                     });
-//                 }}
-//               />
-
-//               <div className="flex-1 h-full min-h-0">
-//                 {initialized && (
-//                   <ResizablePanelGroup
-//                     direction="horizontal"
-//                     className="h-full w-full"
-//                   >
-//                     <ResizablePanel defaultSize={40} minSize={0} maxSize={70}>
-//                       <div className="h-full border-r border-border bg-background overflow-hidden">
-//                         <CodeEditor selectedPath={activeFile ?? undefined} />
-//                       </div>
-//                     </ResizablePanel>
-
-//                     <ResizableHandle withHandle />
-
-//                     <ResizablePanel
-//                       ref={previewPanelRef}
-//                       // defaultSize={60} ignored due to resize bug
-//                       minSize={30}
-//                       maxSize={100}
-//                       className="transition-all duration-1000 ease-all"
-//                     >
-//                       <div className="h-full">
-//                         <ModernDrawer>
-//                           <button
-//                             className="w-7 h-7 flex items-center justify-center hover:color-muted transition"
-//                             onClick={() => previewPanelRef.current?.resize(100)}
-//                           >
-//                             <Laptop className="w-4 h-4" />
-//                           </button>
-//                           <button className="w-7 h-7 flex items-center justify-center hover:color-muted transition"
-//                           onClick={() => previewPanelRef.current?.resize(30)}
-//                           >
-//                             <Smartphone className="w-4 h-4" />
-//                           </button>
-//                           <button className="w-7 h-7 flex items-center justify-center hover:color-muted transition"
-//                           onClick={() => previewPanelRef.current?.resize(60)}
-//                           >
-//                             <RotateCcw className="w-4 h-4" />
-//                           </button>
-//                         </ModernDrawer>
-//                         <LivePreview />
-//                       </div>
-//                     </ResizablePanel>
-//                   </ResizablePanelGroup>
-//                 )}
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-//       </main>
-//     </SandpackProvider>
-//   );
-// }
-
-// -----------------------------------
-
 "use client";
 import React, { useRef, useState, useEffect } from "react";
-import type ReactType from "react";
 
 import CodeEditor from "@/components/CodeEditor";
 import LivePreview from "@/components/LivePreview";
@@ -474,42 +7,15 @@ import ModernDrawer from "@/components/ModernDrawer";
 import AICodeGenerator from "@/components/AICodeGenerator";
 import Toolbar from "@/components/Toolbar";
 import { useProjectStore } from "@/hooks/useProjectStore";
-import {
-  X,
-  Sun,
-  MoonStar,
-  FileText,
-  Laptop,
-  Smartphone,
-  RotateCcw,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { X, Sun, MoonStar, Laptop, Smartphone, RotateCcw, Sparkles } from "lucide-react"
 import { useTheme } from "@/components/ThemeProvider";
 import { useSearchParams } from "next/navigation";
 import { SandpackProvider } from "@codesandbox/sandpack-react";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-
-const FILES = [
-  { name: "App.js", path: "/App.js" },
-  { name: "index.js", path: "/index.js" },
-  { name: "utils.js", path: "/utils.js" },
-];
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
 const FILE_CONTENTS: Record<string, string> = {
   "/App.js": `export default function App() {
-  console.log("Hello CipherStudio!");
-  return <h1>Hello CipherStudio 👋</h1>;
+  return <h1>Hello Nebula 👋</h1>;
 }`,
   "/index.js": `import ReactDOM from "react-dom/client";
 import App from "./App";
@@ -520,283 +26,173 @@ root.render(<App />);`,
 }`,
 };
 
+// ─── Tab bar ──────────────────────────────────────────────────────────────────
+
+function TabBar({
+  openTabs, active, onSelect, onClose, unsaved,
+  showAIPanel, onToggleAI,
+  onResizePreview,
+}: {
+  openTabs: string[]; active?: string
+  onSelect: (p: string) => void; onClose: (p: string) => void
+  unsaved?: Record<string, string> | null
+  showAIPanel: boolean; onToggleAI: () => void
+  onResizePreview: (size: number) => void
+}) {
+  const { theme, toggleTheme } = useTheme()
+
+  return (
+    <div className="flex items-center border-b border-white/7 bg-[#080a0e]" style={{ fontFamily: "'DM Mono', monospace" }}>
+
+      {/* tabs */}
+      <div className="flex-1 flex items-center px-2 py-[6px] gap-1 overflow-x-auto scrollbar-none">
+        {openTabs.map((p) => {
+          const name = p.split("/").pop() || p
+          const hasUnsaved = !!unsaved?.[p]
+          const isActive = active === p
+          return (
+            <div
+              key={p}
+              className={`group relative flex items-center gap-[6px] px-3 py-[5px] rounded-md cursor-pointer transition-all duration-150 flex-shrink-0 ${isActive
+                ? "bg-[#151820] border border-white/10 text-[#f0f2f5]"
+                : "text-white/40 hover:text-white/70 hover:bg-white/5"
+                }`}
+              onClick={() => onSelect(p)}
+            >
+              {hasUnsaved && <span className="w-[5px] h-[5px] rounded-full bg-yellow-400 flex-shrink-0 animate-pulse" />}
+              <span className="text-[12px] truncate max-w-[140px]">{name}</span>
+              {isActive && (
+                <span className="absolute bottom-0 left-3 right-3 h-px" style={{ background: "linear-gradient(90deg, transparent, #c8f04b, transparent)" }} />
+              )}
+              {openTabs.length > 1 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onClose(p) }}
+                  className="w-4 h-4 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity text-white/30 hover:text-white/80 hover:bg-white/10 flex-shrink-0"
+                >
+                  <X size={10} />
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* right-side actions */}
+      <div className="flex items-center gap-1 px-2 border-l border-white/7 flex-shrink-0">
+        {/* preview size buttons */}
+        <button
+          onClick={() => onResizePreview(100)}
+          title="Full preview"
+          className="w-7 h-7 flex items-center justify-center rounded-md text-white/30 hover:text-[#c8f04b] hover:bg-[rgba(200,240,75,0.08)] transition-all duration-200"
+        >
+          <Laptop size={13} />
+        </button>
+        <button
+          onClick={() => onResizePreview(60)}
+          title="Split preview"
+          className="w-7 h-7 flex items-center justify-center rounded-md text-white/30 hover:text-[#c8f04b] hover:bg-[rgba(200,240,75,0.08)] transition-all duration-200"
+        >
+          <RotateCcw size={13} />
+        </button>
+        <button
+          onClick={() => onResizePreview(30)}
+          title="Mobile preview"
+          className="w-7 h-7 flex items-center justify-center rounded-md text-white/30 hover:text-[#c8f04b] hover:bg-[rgba(200,240,75,0.08)] transition-all duration-200"
+        >
+          <Smartphone size={13} />
+        </button>
+
+        <div className="w-px h-4 bg-white/7 mx-1" />
+
+        {/* AI toggle */}
+        <button
+          onClick={onToggleAI}
+          title="Toggle AI panel"
+          className={`w-7 h-7 flex items-center justify-center rounded-md transition-all duration-200 ${showAIPanel
+            ? "text-[#c8f04b] bg-[rgba(200,240,75,0.12)] border border-[rgba(200,240,75,0.2)]"
+            : "text-white/30 hover:text-[#c8f04b] hover:bg-[rgba(200,240,75,0.08)]"
+            }`}
+        >
+          <Sparkles size={13} />
+        </button>
+
+        <div className="w-px h-4 bg-white/7 mx-1" />
+
+        {/* theme toggle */}
+        <button
+          onClick={toggleTheme}
+          title="Toggle theme"
+          className="w-7 h-7 flex items-center justify-center rounded-md text-white/30 hover:text-[#c8f04b] hover:bg-[rgba(200,240,75,0.08)] transition-all duration-200"
+        >
+          {theme === "dark" ? <Sun size={13} /> : <MoonStar size={13} />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Studio ───────────────────────────────────────────────────────────────────
+
 export default function StudioClient() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [activeFile, setActiveFile] = useState<string>("");
-  const [showAIPanel, setShowAIPanel] = useState(false);
   const files = useProjectStore((s) => s.files);
   const setFile = useProjectStore((s) => s.setFile);
   const unsaved = useProjectStore((s) => s.unsaved);
   const commitUnsaved = useProjectStore((s) => s.commitUnsaved);
-  const discardUnsaved = useProjectStore((s) => s.discardUnsaved);
   const [openTabs, setOpenTabs] = useState<string[]>([]);
   const { theme } = useTheme();
   const [initialized, setInitialized] = useState(false);
   const previewPanelRef = useRef<any>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [currentSize, setCurrentSize] = useState(0); // Start from 0 for initial animation
+  const [currentSize, setCurrentSize] = useState(0);
   const animationFrameRef = useRef<number | null>(null);
-
-  const sizeCycle = [100, 60, 30];
   const cycleIndexRef = useRef(0);
+  const sizeCycle = [100, 60, 30];
+  const [showAIPanel, setShowAIPanel] = useState(false)
 
-  // Memoize sandpack options to prevent re-renders
-  const sandpackOptions = React.useMemo(
-    () => ({
-      externalResources: [],
-      bundlerURL: undefined,
-    }),
-    []
-  );
+  const sandpackOptions = React.useMemo(() => ({ externalResources: [], bundlerURL: undefined }), []);
 
-  // Process files for Sandpack - optimized to prevent unnecessary re-renders
   const sandpackFiles = React.useMemo(() => {
     const result: Record<string, string> = {};
-
-    // Ensure we always have App.js and index.js with fallbacks
     result["/App.js"] =
-      files["/App.js"] ||
-      files["/src/App.js"] ||
-      `export default function App() {
-  console.log("Hello CipherStudio!");
-  return <h1>Hello CipherStudio 👋</h1>;
-}`;
-
-    result["/index.js"] =
-      files["/index.js"] ||
-      `import ReactDOM from "react-dom/client";
-import App from "./App";
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App />);`;
-
-    // Add user files
+      files["/App.js"] || files["/src/App.js"] || FILE_CONTENTS["/App.js"];
+    result["/index.js"] = files["/index.js"] || FILE_CONTENTS["/index.js"];
     Object.entries(files).forEach(([p, content]) => {
-      const effective = (unsaved && unsaved[p]) ?? content;
+      const effective = unsaved?.[p] ?? content;
       if (p.startsWith("/src/")) {
         const target = `/${p.slice("/src/".length)}`;
-        // Skip if we already handled these files
-        if (target !== "/App.js" && target !== "/index.js") {
-          result[target] = effective;
-        }
+        if (target !== "/App.js" && target !== "/index.js") result[target] = effective;
       } else if (p !== "/App.js" && p !== "/index.js") {
         result[p] = effective;
       }
     });
-
     return result;
   }, [files, unsaved]);
 
+  // open first file
   useEffect(() => {
     if (activeFile) return;
     const preferred = "/src/App.js";
-    if (files[preferred]) {
-      setActiveFile(preferred);
-      setOpenTabs([preferred]);
-    } else {
-      const first = Object.keys(files)[0];
-      if (first) {
-        setActiveFile(first);
-        setOpenTabs([first]);
-      }
-    }
+    const first = files[preferred] ? preferred : Object.keys(files)[0];
+    if (first) { setActiveFile(first); setOpenTabs([first]); }
   }, [files, activeFile]);
 
   const search = useSearchParams();
-  
-  // Load project from URL param - prioritize this over defaults
-  useEffect(() => {
-    const projectId = search.get("project");
-    
-    // Project loading takes priority
-    if (projectId) {
-      console.log("🔵 [Studio] Loading project from URL:", projectId);
-      try {
-        const loaded = useProjectStore.getState().loadProject(projectId);
-        if (loaded) {
-          console.log("✅ [Studio] Project loaded successfully:", projectId);
-          useProjectStore.getState().saveProject(projectId);
-        } else {
-          console.warn("⚠️  [Studio] Project load returned false:", projectId);
-        }
-      } catch (err) {
-        console.error("❌ [Studio] Failed to load project:", projectId, err);
-      }
-      // Don't initialize with defaults when we have a project ID
-      setInitialized(true);
-      
-      // Trigger initial animation after a short delay
-      setTimeout(() => {
-        handleProgrammaticResize(60);
-        setTimeout(() => {
-          setIsInitialLoad(false);
-        }, 1100);
-      }, 100);
-    }
-  }, [search]);
 
-  // Initialize with default files only if no project is being loaded
-  useEffect(() => {
-    // Only initialize defaults if we don't have a projectId in the URL
-    const projectId = search.get("project");
-    if (projectId) {
-      // Project is being loaded via the other effect, don't interfere
-      return;
-    }
-    
-    const currentFiles = useProjectStore.getState().files;
-    if (Object.keys(currentFiles).length === 0) {
-      console.log("🔵 [Studio] Initializing with default files");
-      Object.entries(FILE_CONTENTS).forEach(([path, content]) => {
-        useProjectStore.getState().setFile(path, content);
-      });
-    }
-    setInitialized(true);
-
-    // Trigger initial animation after a short delay
-    setTimeout(() => {
-      handleProgrammaticResize(60);
-      setTimeout(() => {
-        setIsInitialLoad(false);
-      }, 1100);
-    }, 100);
-  }, [search]);
-
-  // Auto-save project to localStorage (debounced) - always enabled
-  useEffect(() => {
-    const currentProjectId = useProjectStore.getState().currentProjectId;
-    if (!currentProjectId || !files || Object.keys(files).length === 0) {
-      return;
-    }
-
-    // Debounce auto-save - wait 2 seconds after last change
-    const saveTimer = setTimeout(() => {
-      try {
-        const localKey = `cipherstudio:project:${currentProjectId}`;
-        const payload = {
-          files,
-          unsaved: {},
-          savedAt: new Date().toISOString(),
-        };
-        localStorage.setItem(localKey, JSON.stringify(payload));
-        console.log("💾 [Studio] Auto-saved project to localStorage:", currentProjectId);
-      } catch (err) {
-        console.error("❌ [Studio] Auto-save failed:", err);
-      }
-    }, 2000);
-
-    return () => clearTimeout(saveTimer);
-  }, [files]);
-
-  // Add global CSS to handle iframe pointer events during resize
-  useEffect(() => {
-    const style = document.createElement("style");
-    style.id = "resize-handle-fix";
-    style.textContent = `
-      /* Disable pointer events on iframes and potentially problematic elements during resize */
-      [data-panel-group-direction="horizontal"]:active iframe,
-      [data-panel-group-direction="horizontal"]:active .sp-preview-iframe,
-      [data-panel-group-direction="horizontal"]:active .cm-editor,
-      body.is-resizing iframe,
-      body.is-resizing .sp-preview-iframe,
-      body.is-resizing .cm-editor {
-        pointer-events: none !important;
-      }
-
-      /* Ensure resize handle is always on top and has proper cursor */
-      [data-resize-handle] {
-        z-index: 50;
-        cursor: col-resize !important;
-        touch-action: none;
-      }
-
-      /* Prevent text selection during resize */
-      body.is-resizing {
-        user-select: none !important;
-        -webkit-user-select: none !important;
-        cursor: col-resize !important;
-      }
-    `;
-    document.head.appendChild(style);
-    let isDragging = false;
-
-    const handleMouseDown = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest("[data-resize-handle]")) {
-        isDragging = true;
-        document.body.classList.add("is-resizing");
-        document.body.style.cursor = "col-resize";
-      }
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging && e.buttons !== 1) {
-        isDragging = false;
-        document.body.classList.remove("is-resizing");
-        document.body.style.cursor = "";
-      }
-    };
-
-    const handleMouseUp = () => {
-      if (isDragging) {
-        isDragging = false;
-        document.body.classList.remove("is-resizing");
-        document.body.style.cursor = "";
-      }
-    };
-
-    document.addEventListener("mousedown", handleMouseDown, true);
-    document.addEventListener("mousemove", handleMouseMove, true);
-    document.addEventListener("mouseup", handleMouseUp, true);
-
-    return () => {
-      style.remove();
-      document.removeEventListener("mousedown", handleMouseDown, true);
-      document.removeEventListener("mousemove", handleMouseMove, true);
-      document.removeEventListener("mouseup", handleMouseUp, true);
-      document.body.classList.remove("is-resizing");
-      document.body.style.cursor = "";
-    };
-  }, []);
-
-  // Helper function to handle programmatic resize with animation
-  const handleProgrammaticResize = (targetSize: number) => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
-
+  const handleProgrammaticResize = React.useCallback((targetSize: number) => {
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     setIsAnimating(true);
-
     const startSize = currentSize;
     const startTime = performance.now();
-    const duration = 700; // 0.7 seconds
-
-    const animate = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-
-      // easeInOutQuad
-      // const easeInOut = progress < 0.5
-      //   ? 2 * progress * progress
-      //   : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-
-      // easeInOutQuint
-      // const easeInOut = progress < 0.5
-      //   ? 16 * progress * progress * progress * progress * progress
-      //   : 1 - Math.pow(-2 * progress + 2, 5) / 2;
-
-      // easeInOutQuart
-      const easeInOut =
-        progress < 0.5
-          ? 8 * progress * progress * progress * progress
-          : 1 - Math.pow(-2 * progress + 2, 4) / 2;
-
-      const newSize = startSize + (targetSize - startSize) * easeInOut;
-
-      if (previewPanelRef.current) {
-        previewPanelRef.current.resize(newSize);
-      }
-
+    const duration = 700;
+    const animate = (now: number) => {
+      const progress = Math.min((now - startTime) / duration, 1);
+      const easeInOut = progress < 0.5
+        ? 8 * progress ** 4
+        : 1 - (-2 * progress + 2) ** 4 / 2;
+      previewPanelRef.current?.resize(startSize + (targetSize - startSize) * easeInOut);
       if (progress < 1) {
         animationFrameRef.current = requestAnimationFrame(animate);
       } else {
@@ -805,203 +201,135 @@ root.render(<App />);`;
         animationFrameRef.current = null;
       }
     };
-
     animationFrameRef.current = requestAnimationFrame(animate);
-  };
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+. to toggle AI panel / code editor
-      if (e.ctrlKey && e.code === "Period") {
-        e.preventDefault();
-        setShowAIPanel((prev) => !prev);
-      }
-      // Ctrl+Space to cycle preview sizes
-      if (e.ctrlKey && e.code === "Space") {
-        e.preventDefault();
-
-        const nextIndex = (cycleIndexRef.current + 1) % sizeCycle.length;
-
-        cycleIndexRef.current = nextIndex;
-
-        handleProgrammaticResize(sizeCycle[nextIndex]);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [handleProgrammaticResize]);
-
-  useEffect(() => {
-    const index = sizeCycle.indexOf(currentSize);
-    if (index !== -1) {
-      cycleIndexRef.current = index;
-    }
   }, [currentSize]);
 
+  // load project from URL
   useEffect(() => {
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
+    const projectId = search.get("project");
+    if (projectId) {
+      try {
+        useProjectStore.getState().loadProject(projectId);
+        useProjectStore.getState().saveProject(projectId);
+      } catch { }
+      setInitialized(true);
+      setTimeout(() => { handleProgrammaticResize(60); setTimeout(() => setIsInitialLoad(false), 1100); }, 100);
+    }
+  }, [search]);
+
+  // init defaults
+  useEffect(() => {
+    if (search.get("project")) return;
+    const currentFiles = useProjectStore.getState().files;
+    if (Object.keys(currentFiles).length === 0) {
+      Object.entries(FILE_CONTENTS).forEach(([p, c]) => useProjectStore.getState().setFile(p, c));
+    }
+    setInitialized(true);
+    setTimeout(() => { handleProgrammaticResize(60); setTimeout(() => setIsInitialLoad(false), 1100); }, 100);
+  }, [search]);
+
+  // auto-save
+  useEffect(() => {
+    const projectId = useProjectStore.getState().currentProjectId;
+    if (!projectId || !files || Object.keys(files).length === 0) return;
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem(`nebula:project:${projectId}`, JSON.stringify({ files, unsaved: {}, savedAt: new Date().toISOString() }));
+      } catch { }
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [files]);
+
+  // resize cursor fix
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = `
+      body.is-resizing iframe, body.is-resizing .cm-editor { pointer-events: none !important; }
+      [data-resize-handle] { z-index: 50; cursor: col-resize !important; touch-action: none; }
+      body.is-resizing { user-select: none !important; cursor: col-resize !important; }
+    `;
+    document.head.appendChild(style);
+    let dragging = false;
+    const down = (e: MouseEvent) => { if ((e.target as HTMLElement).closest("[data-resize-handle]")) { dragging = true; document.body.classList.add("is-resizing"); } };
+    const move = (e: MouseEvent) => { if (dragging && e.buttons !== 1) { dragging = false; document.body.classList.remove("is-resizing"); } };
+    const up = () => { if (dragging) { dragging = false; document.body.classList.remove("is-resizing"); } };
+    document.addEventListener("mousedown", down, true);
+    document.addEventListener("mousemove", move, true);
+    document.addEventListener("mouseup", up, true);
+    return () => { style.remove(); document.removeEventListener("mousedown", down, true); document.removeEventListener("mousemove", move, true); document.removeEventListener("mouseup", up, true); document.body.classList.remove("is-resizing"); };
+  }, []);
+
+  useEffect(() => {
+    const idx = sizeCycle.indexOf(currentSize);
+    if (idx !== -1) cycleIndexRef.current = idx;
+  }, [currentSize]);
+
+  useEffect(() => () => { if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current); }, []);
+
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = `
+    body.is-resizing * { pointer-events: none !important; }
+    body.is-resizing { pointer-events: all !important; cursor: col-resize !important; user-select: none !important; }
+    [data-resize-handle] { z-index: 50 !important; cursor: col-resize !important; touch-action: none; }
+  `;
+    document.head.appendChild(style);
+
+    let dragging = false;
+
+    const down = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest("[data-resize-handle]")) {
+        dragging = true;
+        document.body.classList.add("is-resizing");
       }
+    };
+    const move = (e: MouseEvent) => {
+      if (dragging && e.buttons !== 1) {
+        dragging = false;
+        document.body.classList.remove("is-resizing");
+      }
+    };
+    const up = () => {
+      if (dragging) {
+        dragging = false;
+        document.body.classList.remove("is-resizing");
+      }
+    };
+
+    document.addEventListener("mousedown", down, true);
+    document.addEventListener("mousemove", move, true);
+    document.addEventListener("mouseup", up, true);
+
+    return () => {
+      style.remove();
+      document.removeEventListener("mousedown", down, true);
+      document.removeEventListener("mousemove", move, true);
+      document.removeEventListener("mouseup", up, true);
+      document.body.classList.remove("is-resizing");
     };
   }, []);
 
-  function TabBar({
-    openTabs,
-    active,
-    onSelect,
-    onClose,
-  }: {
-    openTabs: string[];
-    active?: string;
-    onSelect: (p: string) => void;
-    onClose: (p: string) => void;
-  }) {
-    const { theme, toggleTheme } = useTheme();
-
-    return (
-      <TooltipProvider>
-        <div className="flex items-center border-b border-border bg-muted/30 backdrop-blur-sm">
-          <ScrollArea className="flex-1">
-            <div className="flex items-center px-2 py-1.5 gap-1">
-              {openTabs.map((p) => {
-                const name = p.split("/").pop() || p;
-                const hasUnsaved = !!unsaved?.[p];
-                const isActive = active === p;
-
-                return (
-                  <div
-                    key={p}
-                    className={`
-                      group relative flex items-center gap-2 px-3 py-2 rounded-md
-                      transition-all duration-200 ease-in-out
-                      ${
-                        isActive
-                          ? "bg-background shadow-sm border border-border"
-                          : "hover:bg-muted"
-                      }
-                    `}
-                  >
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => onSelect(p)}
-                          className="flex items-center gap-2 min-w-0 outline-none"
-                        >
-                          <FileText
-                            className={`w-3.5 h-3.5 flex-shrink-0 ${
-                              isActive
-                                ? "text-primary"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                          <span
-                            className={`text-sm truncate max-w-[120px] ${
-                              isActive
-                                ? "font-medium text-foreground"
-                                : "text-muted-foreground"
-                            }`}
-                          >
-                            {name}
-                          </span>
-                          {hasUnsaved && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 flex-shrink-0 animate-pulse" />
-                          )}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="text-xs">
-                        <p>{p}</p>
-                        {hasUnsaved && (
-                          <p className="text-yellow-500">Unsaved changes</p>
-                        )}
-                      </TooltipContent>
-                    </Tooltip>
-
-                    {openTabs.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={`
-                          h-5 w-5 p-0 rounded-sm
-                          opacity-0 group-hover:opacity-100
-                          transition-opacity duration-200
-                          hover:bg-muted-foreground/20
-                          ${isActive ? "opacity-60" : ""}
-                        `}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onClose(p);
-                        }}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-
-          <div className="flex items-center px-2 border-l border-border">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => toggleTheme()}
-                >
-                  {theme === "dark" ? (
-                    <Sun className="h-4 w-4" />
-                  ) : (
-                    <MoonStar className="h-4 w-4" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>Toggle theme</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
-      </TooltipProvider>
-    );
-  }
-
   return (
-    <SandpackProvider
-      template="react"
-      files={sandpackFiles}
-      theme={theme === "dark" ? "dark" : "light"}
-      options={sandpackOptions}
-    >
-      <main className="h-screen flex flex-col bg-background text-foreground">
-        <div className="flex-1" ref={containerRef}>
-          <div className="h-full flex">
+    <SandpackProvider template="react" files={sandpackFiles} theme={theme === "dark" ? "dark" : "light"} options={sandpackOptions}>
+      <main className="h-screen flex flex-col bg-[#080a0e] text-[#f0f2f5]" style={{ fontFamily: "'DM Mono', monospace" }}>
+        <div className="flex-1 flex flex-col min-h-0" ref={containerRef}>
+          <div className="h-full flex min-h-0">
+
+            {/* sidebar */}
             <Toolbar
               activeFile={activeFile}
               onOpen={(p: string) => {
                 setActiveFile(p);
-                setOpenTabs((tabs) => (tabs.includes(p) ? tabs : [...tabs, p]));
-                if (!files[p]) {
-                  const content = FILE_CONTENTS[p] ?? "";
-                  if (content) setFile(p, content);
-                }
+                setOpenTabs((tabs) => tabs.includes(p) ? tabs : [...tabs, p]);
+                if (!files[p]) { const c = FILE_CONTENTS[p] ?? ""; if (c) setFile(p, c); }
               }}
               onRename={(oldP: string, newP: string) => {
                 useProjectStore.getState().renameFile(oldP, newP);
                 if (activeFile === oldP) setActiveFile(newP);
-                // Update open tabs to reflect the rename
-                setOpenTabs((tabs) => tabs.map((t) => (t === oldP ? newP : t)));
+                setOpenTabs((tabs) => tabs.map((t) => t === oldP ? newP : t));
               }}
               onDelete={(p: string) => {
                 useProjectStore.getState().deleteFile(p);
-                // Close the tab if it's open
                 setOpenTabs((tabs) => tabs.filter((t) => t !== p));
                 if (activeFile === p) {
                   const remaining = openTabs.filter((t) => t !== p);
@@ -1009,35 +337,42 @@ root.render(<App />);`;
                 }
               }}
             />
-            <div className="flex-1 flex flex-col">
+
+            {/* main area */}
+            <div className="flex-1 flex flex-col min-w-0">
               <TabBar
                 openTabs={openTabs}
                 active={activeFile}
+                unsaved={unsaved}
+                showAIPanel={showAIPanel}
+                onToggleAI={() => setShowAIPanel((v) => !v)}
+                onResizePreview={handleProgrammaticResize}
                 onSelect={(p) => setActiveFile(p)}
                 onClose={(p) => {
-                  const hasUnsaved = !!unsaved?.[p];
-                  // Always auto-commit unsaved changes
-                  if (hasUnsaved) {
-                    commitUnsaved(p);
+                  if (unsaved?.[p]) commitUnsaved(p)
+                  setOpenTabs((t) => t.filter((x) => x !== p))
+                  if (activeFile === p) {
+                    const next = openTabs.find((x) => x !== p)
+                    setActiveFile(next ?? "")
                   }
-                  setOpenTabs((t) => t.filter((x) => x !== p));
-                  if (activeFile === p)
-                    setActiveFile((t) => {
-                      const next = openTabs.find((x) => x !== p);
-                      return next ?? "";
-                    });
                 }}
               />
 
-              <div className="flex-1 h-full min-h-0">
+              <div className="flex-1 min-h-0">
                 {initialized && (
-                  <ResizablePanelGroup
-                    direction="horizontal"
-                    className="h-full w-full"
-                  >
+                  <ResizablePanelGroup direction="horizontal" className="h-full w-full">
+                    {showAIPanel && (
+                      <>
+                        <ResizablePanel defaultSize={25} minSize={18} maxSize={40}>
+                          <AICodeGenerator onClose={() => setShowAIPanel(false)} />
+                        </ResizablePanel>
+                        <ResizableHandle withHandle />
+                      </>
+                    )}
+
                     <ResizablePanel defaultSize={40} minSize={0} maxSize={70}>
-                      <div className="h-full border-r border-border bg-background overflow-hidden">
-                        <CodeEditor selectedPath={activeFile ?? undefined} />
+                      <div className="h-full border-r border-white/7 bg-[#080a0e] overflow-hidden">
+                        <CodeEditor selectedPath={activeFile || undefined} />
                       </div>
                     </ResizablePanel>
 
@@ -1046,39 +381,25 @@ root.render(<App />);`;
                     <ResizablePanel
                       ref={previewPanelRef}
                       minSize={isInitialLoad ? 0 : 30}
-                      maxSize={100}
+                      maxSize={showAIPanel ? 60 : 100}
                       defaultSize={0}
-                      onResize={(size) => {
-                        if (!isAnimating && !isInitialLoad) {
-                          setCurrentSize(size);
-                        }
-                      }}
+                      onResize={(size) => { if (!isAnimating && !isInitialLoad) setCurrentSize(size) }}
                     >
-                      <div className="h-full">
-                        <ModernDrawer>
-                          <button
-                            className="w-7 h-7 flex items-center justify-center hover:text-muted-foreground transition"
-                            onClick={() => handleProgrammaticResize(100)}
-                          >
-                            <Laptop className="w-4 h-4" />
+                      <div className="h-full relative">
+                        {/* <ModernDrawer>
+                          <button className="w-7 h-7 flex items-center justify-center text-white/30 hover:text-[#c8f04b] hover:bg-[rgba(200,240,75,0.08)] rounded-md transition-all" onClick={() => handleProgrammaticResize(100)} title="Full width">
+                            <Laptop size={13} />
                           </button>
-                          <button
-                            className="w-7 h-7 flex items-center justify-center hover:text-muted-foreground transition"
-                            onClick={() => handleProgrammaticResize(30)}
-                          >
-                            <Smartphone className="w-4 h-4" />
+                          <button className="w-7 h-7 flex items-center justify-center text-white/30 hover:text-[#c8f04b] hover:bg-[rgba(200,240,75,0.08)] rounded-md transition-all" onClick={() => handleProgrammaticResize(30)} title="Mobile">
+                            <Smartphone size={13} />
                           </button>
-                          <button
-                            className="w-7 h-7 flex items-center justify-center hover:text-muted-foreground transition"
-                            onClick={() => handleProgrammaticResize(60)}
-                          >
-                            <RotateCcw className="w-4 h-4" />
+                          <button className="w-7 h-7 flex items-center justify-center text-white/30 hover:text-[#c8f04b] hover:bg-[rgba(200,240,75,0.08)] rounded-md transition-all" onClick={() => handleProgrammaticResize(60)} title="Reset">
+                            <RotateCcw size={13} />
                           </button>
-                        </ModernDrawer>
+                        </ModernDrawer> */}
                         <LivePreview />
                       </div>
                     </ResizablePanel>
-                    <AICodeGenerator />
                   </ResizablePanelGroup>
                 )}
               </div>
