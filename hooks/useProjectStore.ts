@@ -78,7 +78,7 @@ export const useProjectStore = create<FileState>((set) => {
   return ({
     files: {
       "/src/App.js": `export default function App() {
-  return <h1>Hello nebula 👋</h1>;
+  return <h1>Hello Nebula 👋</h1>;
 }`,
       "/src/index.js": `import ReactDOM from "react-dom/client";
 import App from "./App";

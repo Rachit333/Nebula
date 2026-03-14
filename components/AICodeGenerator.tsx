@@ -1,785 +1,155 @@
-// "use client"
-// import type React from "react"
-// import { useState, useRef, useEffect } from "react"
-// import { useAICodeGeneration } from "@/hooks/useAICodeGeneration"
-// import { Button } from "@/components/ui/button"
-// import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-// import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-// import {
-//   Loader2,
-//   Sparkles,
-//   AlertCircle,
-//   CheckCircle2,
-//   FileCode2,
-//   Trash2,
-//   Send,
-//   Command,
-//   GripHorizontal,
-//   Bot,
-//   User,
-//   MessageSquarePlus,
-//   ListTodo,
-//   Circle,
-//   CheckCircle,
-//   ChevronDown,
-// } from "lucide-react"
-// import { cn } from "@/lib/utils"
-
-// interface Todo {
-//   id: string
-//   title: string
-//   description: string
-//   priority: "high" | "medium" | "low"
-//   tags: string[]
-//   completed: boolean
-// }
-
-// interface ClarificationQuestion {
-//   id: string
-//   label: string
-//   type: "text" | "textarea" | "single-select" | "multi-select"
-//   required?: boolean
-//   placeholder?: string
-//   options?: string[]
-// }
-
-// interface ChatMessage {
-//   id: string
-//   type: "prompt" | "response" | "clarification"
-//   content: string
-//   error?: string
-//   files?: Record<string, string>
-//   mergeStrategy?: Record<string, string>
-//   todos?: Todo[]
-//   questions?: ClarificationQuestion[]
-// }
-
-// interface AICodeGeneratorProps {
-//   onSuccess?: () => void
-//   trigger?: React.ReactNode
-// }
-
-// export default function AICodeGenerator({}: AICodeGeneratorProps) {
-//   const [open, setOpen] = useState(false)
-//   const [prompt, setPrompt] = useState("")
-//   const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>({})
-//   const [position, setPosition] = useState({ x: 0, y: 0 })
-//   const [isDragging, setIsDragging] = useState(false)
-//   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
-//   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set())
-//   const { isLoading, chatHistory, generateCode, clearHistory } = useAICodeGeneration()
-//   const historyEndRef = useRef<HTMLDivElement>(null)
-//   const dialogRef = useRef<HTMLDivElement>(null)
-//   const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-//   // Listen for Ctrl+. to open dialog
-//   useEffect(() => {
-//     const handleKeyDown = (e: KeyboardEvent) => {
-//       if ((e.ctrlKey || e.metaKey) && e.key === ".") {
-//         e.preventDefault()
-//         setOpen(true)
-//       }
-//     }
-
-//     window.addEventListener("keydown", handleKeyDown)
-//     return () => window.removeEventListener("keydown", handleKeyDown)
-//   }, [])
-
-//   // Focus textarea when dialog opens
-//   useEffect(() => {
-//     if (open && textareaRef.current) {
-//       setTimeout(() => textareaRef.current?.focus(), 100)
-//     }
-//   }, [open])
-
-//   // Handle dragging
-//   useEffect(() => {
-//     if (!isDragging) return
-
-//     const handleMouseMove = (e: MouseEvent) => {
-//       const deltaX = e.clientX - dragStart.x
-//       const deltaY = e.clientY - dragStart.y
-//       setPosition({ x: position.x + deltaX, y: position.y + deltaY })
-//       setDragStart({ x: e.clientX, y: e.clientY })
-//     }
-
-//     const handleMouseUp = () => {
-//       setIsDragging(false)
-//     }
-
-//     window.addEventListener("mousemove", handleMouseMove)
-//     window.addEventListener("mouseup", handleMouseUp)
-
-//     return () => {
-//       window.removeEventListener("mousemove", handleMouseMove)
-//       window.removeEventListener("mouseup", handleMouseUp)
-//     }
-//   }, [isDragging, dragStart, position])
-
-//   const handleMouseDown = (e: React.MouseEvent) => {
-//     if ((e.target as HTMLElement).closest("[data-drag-handle]")) {
-//       setIsDragging(true)
-//       setDragStart({ x: e.clientX, y: e.clientY })
-//     }
-//   }
-
-//   const toggleMessageExpanded = (messageId: string) => {
-//     setExpandedMessages((prev) => {
-//       const newSet = new Set(prev)
-//       if (newSet.has(messageId)) {
-//         newSet.delete(messageId)
-//       } else {
-//         newSet.add(messageId)
-//       }
-//       return newSet
-//     })
-//   }
-
-//   // Auto-scroll to bottom when new messages arrive
-//   useEffect(() => {
-//     historyEndRef.current?.scrollIntoView({ behavior: "smooth" })
-//   }, [chatHistory])
-
-//   const handleGenerate = async () => {
-//     if (prompt.trim()) {
-//       await generateCode({
-//         prompt,
-//       })
-//       setPrompt("")
-//     }
-//   }
-
-//   const handleSubmitClarification = async () => {
-//     const answers = Object.entries(clarificationAnswers)
-//       .map(([key, ans]) => `${key}: ${ans}`)
-//       .join("\n")
-
-//     if (answers.trim()) {
-//       await generateCode({
-//         prompt: answers,
-//       })
-//       setClarificationAnswers({})
-//     }
-//   }
-
-//   const getPriorityColor = (priority: string) => {
-//     switch (priority) {
-//       case "high":
-//         return "text-red-600 bg-red-500/10 border-red-500/20"
-//       case "medium":
-//         return "text-amber-600 bg-amber-500/10 border-amber-500/20"
-//       case "low":
-//         return "text-blue-600 bg-blue-500/10 border-blue-500/20"
-//       default:
-//         return "text-muted-foreground bg-muted/10 border-border/20"
-//     }
-//   }
-
-//   return (
-//     <>
-//       <style jsx global>{`
-//         [data-radix-dialog-overlay] {
-//           background-color: rgba(0, 0, 0, 0.4) !important;
-//         }
-//       `}</style>
-//       <Dialog open={open} onOpenChange={setOpen} modal={false}>
-//         <DialogContent
-//           ref={dialogRef}
-//           className="max-w-2xl h-[85vh] flex flex-col p-0 gap-0 rounded-2xl border border-border/50 shadow-2xl overflow-hidden bg-background/95"
-//           style={{
-//             transform: `translate(${position.x}px, ${position.y}px)`,
-//             cursor: isDragging ? "grabbing" : "default",
-//           }}
-//           onMouseDown={handleMouseDown}
-//         >
-//           {/* Header */}
-//           <DialogHeader
-//             className="px-5 py-4 border-b border-border/50 cursor-grab active:cursor-grabbing select-none bg-muted/30"
-//             data-drag-handle
-//           >
-//             <div className="flex items-center justify-between">
-//               <div className="flex items-center gap-3">
-//                 <div className="relative">
-//                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/20">
-//                     <Sparkles className="w-5 h-5 text-primary-foreground" />
-//                   </div>
-//                   <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-background" />
-//                 </div>
-//                 <div>
-//                   <DialogTitle className="text-base font-semibold">AI Code Generator</DialogTitle>
-//                   <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-//                     <Command className="w-3 h-3" />
-//                     <span>+ .</span>
-//                     <span className="text-muted-foreground/60">to toggle</span>
-//                   </p>
-//                 </div>
-//               </div>
-//               <div className="flex items-center gap-2">
-//                 <GripHorizontal className="w-5 h-5 text-muted-foreground/40" />
-//               </div>
-//             </div>
-//           </DialogHeader>
-
-//           <div className="flex-1 flex flex-col min-h-0">
-//             {/* Chat History */}
-//             <div className="flex-1 overflow-y-auto min-h-0 px-5 py-4">
-//               {chatHistory.length === 0 ? (
-//                 <div className="flex flex-col items-center justify-center h-full text-center px-8">
-//                   <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
-//                     <MessageSquarePlus className="w-8 h-8 text-muted-foreground/50" />
-//                   </div>
-//                   <h3 className="text-sm font-medium text-foreground mb-1">Start a conversation</h3>
-//                   <p className="text-xs text-muted-foreground max-w-[280px] leading-relaxed">
-//                     Describe what you want to build and I'll generate the code for you.
-//                   </p>
-//                 </div>
-//               ) : (
-//                 <div className="space-y-4">
-//                   {chatHistory.map((message) => (
-//                     <div key={message.id} className="space-y-4">
-//                       {/* User Prompt */}
-//                       {message.type === "prompt" && (
-//                         <div className="flex gap-3 justify-end">
-//                           <div className="max-w-[85%] flex flex-col items-end gap-2">
-//                             <div className="bg-primary text-primary-foreground px-4 py-2.5 rounded-2xl rounded-br-md text-sm leading-relaxed shadow-sm">
-//                               {message.content}
-//                             </div>
-//                           </div>
-//                           <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
-//                             <User className="w-4 h-4 text-secondary-foreground" />
-//                           </div>
-//                         </div>
-//                       )}
-
-//                       {/* AI Response with Code */}
-//                       {message.type === "response" && (
-//                         <div className="flex gap-3">
-//                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center flex-shrink-0 shadow-sm">
-//                             <Bot className="w-4 h-4 text-primary-foreground" />
-//                           </div>
-//                           <div className="max-w-[85%] space-y-3">
-//                             {message.error ? (
-//                               <div className="flex items-start gap-2.5 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
-//                                 <AlertCircle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
-//                                 <p className="text-sm text-destructive">{message.error}</p>
-//                               </div>
-//                             ) : (
-//                               <>
-//                                 {message.content && (
-//                                   <div className="bg-muted/60 px-4 py-2.5 rounded-2xl rounded-bl-md border border-border/50">
-//                                     <p className="text-sm text-foreground leading-relaxed">{message.content}</p>
-//                                   </div>
-//                                 )}
-
-//                                 {message.files && Object.keys(message.files).length > 0 && (
-//                                   <Collapsible
-//                                     open={expandedMessages.has(message.id)}
-//                                     onOpenChange={() => toggleMessageExpanded(message.id)}
-//                                   >
-//                                     <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl overflow-hidden">
-//                                       <CollapsibleTrigger asChild>
-//                                         <button className="w-full flex items-center justify-between p-3 hover:bg-emerald-500/5 transition-colors">
-//                                           <div className="flex items-center gap-2">
-//                                             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-//                                             <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-//                                               {Object.keys(message.files).length} file
-//                                               {Object.keys(message.files).length !== 1 ? "s" : ""} generated
-//                                             </span>
-//                                           </div>
-//                                           <ChevronDown
-//                                             className="w-4 h-4 text-emerald-600 transition-transform"
-//                                             style={{
-//                                               transform: expandedMessages.has(message.id)
-//                                                 ? "rotate(0deg)"
-//                                                 : "rotate(-90deg)",
-//                                             }}
-//                                           />
-//                                         </button>
-//                                       </CollapsibleTrigger>
-//                                       <CollapsibleContent>
-//                                         <div className="space-y-1.5 p-3 pt-0 border-t border-emerald-500/10">
-//                                           {Object.keys(message.files).map((filePath) => (
-//                                             <div
-//                                               key={filePath}
-//                                               className="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-emerald-500/10 transition-colors"
-//                                             >
-//                                               <FileCode2 className="w-3.5 h-3.5 text-emerald-600" />
-//                                               <span className="text-xs text-foreground font-mono truncate">
-//                                                 {filePath}
-//                                               </span>
-//                                               {message.mergeStrategy?.[filePath] === "append" && (
-//                                                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-600 font-medium whitespace-nowrap">
-//                                                   appended
-//                                                 </span>
-//                                               )}
-//                                             </div>
-//                                           ))}
-//                                         </div>
-//                                       </CollapsibleContent>
-//                                     </div>
-//                                   </Collapsible>
-//                                 )}
-
-//                                 {message.todos && message.todos.length > 0 && (
-//                                   <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 space-y-3">
-//                                     <div className="flex items-center gap-2 mb-2">
-//                                       <ListTodo className="w-4 h-4 text-purple-600" />
-//                                       <span className="text-xs font-medium text-purple-700 dark:text-purple-400">
-//                                         {message.todos.length} recommended task
-//                                         {message.todos.length !== 1 ? "s" : ""}
-//                                       </span>
-//                                     </div>
-//                                     <div className="space-y-2">
-//                                       {message.todos.map((todo) => (
-//                                         <div
-//                                           key={todo.id}
-//                                           className="bg-background/50 rounded-lg p-3 border border-border/30 space-y-2"
-//                                         >
-//                                           <div className="flex items-start gap-2">
-//                                             {todo.completed ? (
-//                                               <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
-//                                             ) : (
-//                                               <Circle className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-//                                             )}
-//                                             <div className="flex-1 min-w-0">
-//                                               <div className="flex items-center gap-2 flex-wrap mb-1">
-//                                                 <h4 className="text-sm font-medium text-foreground">{todo.title}</h4>
-//                                                 <span
-//                                                   className={cn(
-//                                                     "text-[10px] px-2 py-0.5 rounded-full border font-medium uppercase tracking-wide",
-//                                                     getPriorityColor(todo.priority),
-//                                                   )}
-//                                                 >
-//                                                   {todo.priority}
-//                                                 </span>
-//                                               </div>
-//                                               <p className="text-xs text-muted-foreground leading-relaxed mb-2">
-//                                                 {todo.description}
-//                                               </p>
-//                                               {(todo.tags ?? []).length > 0 && (
-//                                                 <div className="flex flex-wrap gap-1">
-//                                                   {(todo.tags ?? []).map((tag, idx) => (
-//                                                     <span
-//                                                       key={idx}
-//                                                       className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
-//                                                     >
-//                                                       {tag}
-//                                                     </span>
-//                                                   ))}
-//                                                 </div>
-//                                               )}
-//                                             </div>
-//                                           </div>
-//                                         </div>
-//                                       ))}
-//                                     </div>
-//                                   </div>
-//                                 )}
-//                               </>
-//                             )}
-//                           </div>
-//                         </div>
-//                       )}
-
-//                       {/* Clarification Question */}
-//                       {message.type === "clarification" && (
-//                         <div className="flex gap-3">
-//                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-//                             <AlertCircle className="w-4 h-4 text-white" />
-//                           </div>
-//                           <div className="flex-1 max-w-[90%] space-y-3">
-//                             {message.content && (
-//                               <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-//                                 <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-//                                   {message.content}
-//                                 </p>
-//                               </div>
-//                             )}
-
-//                             {message.questions && message.questions.length > 0 && (
-//                               <div className="space-y-4 bg-muted/40 rounded-xl p-4 border border-border/50">
-//                                 {message.questions.map((question, idx) => (
-//                                   <div key={question.id} className="space-y-2">
-//                                     <label className="block">
-//                                       <p className="text-sm font-medium text-foreground mb-2 flex items-start gap-2">
-//                                         <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-600 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
-//                                           {idx + 1}
-//                                         </span>
-//                                         <span className="flex-1">
-//                                           {question.label}
-//                                           {question.required && <span className="text-red-500 ml-1">*</span>}
-//                                         </span>
-//                                       </p>
-
-//                                       {question.type === "single-select" && (
-//                                         <select
-//                                           value={clarificationAnswers[question.id] || ""}
-//                                           onChange={(e) =>
-//                                             setClarificationAnswers({
-//                                               ...clarificationAnswers,
-//                                               [question.id]: e.target.value,
-//                                             })
-//                                           }
-//                                           className="w-full px-3 py-2.5 text-sm rounded-xl bg-background border border-input hover:border-ring focus:border-ring focus:ring-2 focus:ring-ring/20 text-foreground transition-all outline-none"
-//                                         >
-//                                           <option value="">Select an option...</option>
-//                                           {question.options?.map((opt) => (
-//                                             <option key={opt} value={opt}>
-//                                               {opt}
-//                                             </option>
-//                                           ))}
-//                                         </select>
-//                                       )}
-
-//                                       {question.type === "multi-select" && (
-//                                         <div className="grid grid-cols-2 gap-2">
-//                                           {question.options?.map((opt) => (
-//                                             <label
-//                                               key={opt}
-//                                               className={cn(
-//                                                 "flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-all",
-//                                                 (clarificationAnswers[question.id] || "").split(",").includes(opt)
-//                                                   ? "bg-primary/10 border-primary/30 text-foreground"
-//                                                   : "bg-background border-input hover:border-ring/50",
-//                                               )}
-//                                             >
-//                                               <input
-//                                                 type="checkbox"
-//                                                 value={opt}
-//                                                 checked={(clarificationAnswers[question.id] || "")
-//                                                   .split(",")
-//                                                   .includes(opt)}
-//                                                 onChange={(e) => {
-//                                                   const current = (clarificationAnswers[question.id] || "")
-//                                                     .split(",")
-//                                                     .filter(Boolean)
-//                                                   if (e.target.checked) {
-//                                                     current.push(opt)
-//                                                   } else {
-//                                                     const idx = current.indexOf(opt)
-//                                                     if (idx > -1) current.splice(idx, 1)
-//                                                   }
-//                                                   setClarificationAnswers({
-//                                                     ...clarificationAnswers,
-//                                                     [question.id]: current.join(","),
-//                                                   })
-//                                                 }}
-//                                                 className="w-4 h-4 rounded accent-primary"
-//                                               />
-//                                               <span className="text-sm">{opt}</span>
-//                                             </label>
-//                                           ))}
-//                                         </div>
-//                                       )}
-
-//                                       {question.type === "text" && (
-//                                         <input
-//                                           type="text"
-//                                           value={clarificationAnswers[question.id] || ""}
-//                                           onChange={(e) =>
-//                                             setClarificationAnswers({
-//                                               ...clarificationAnswers,
-//                                               [question.id]: e.target.value,
-//                                             })
-//                                           }
-//                                           placeholder={question.placeholder || "Enter your answer..."}
-//                                           className="w-full px-3 py-2.5 text-sm rounded-xl bg-background border border-input hover:border-ring focus:border-ring focus:ring-2 focus:ring-ring/20 text-foreground transition-all outline-none placeholder:text-muted-foreground"
-//                                         />
-//                                       )}
-
-//                                       {question.type === "textarea" && (
-//                                         <textarea
-//                                           value={clarificationAnswers[question.id] || ""}
-//                                           onChange={(e) =>
-//                                             setClarificationAnswers({
-//                                               ...clarificationAnswers,
-//                                               [question.id]: e.target.value,
-//                                             })
-//                                           }
-//                                           placeholder={question.placeholder || "Enter your answer..."}
-//                                           className="w-full min-h-[80px] px-3 py-2.5 text-sm rounded-xl bg-background border border-input hover:border-ring focus:border-ring focus:ring-2 focus:ring-ring/20 text-foreground resize-none transition-all outline-none placeholder:text-muted-foreground"
-//                                         />
-//                                       )}
-//                                     </label>
-//                                   </div>
-//                                 ))}
-
-//                                 <Button
-//                                   onClick={() => handleSubmitClarification()}
-//                                   disabled={
-//                                     isLoading ||
-//                                     message.questions!.some((q) => q.required && !clarificationAnswers[q.id]?.trim())
-//                                   }
-//                                   className="w-full mt-2 rounded-xl h-10"
-//                                 >
-//                                   <Send className="w-4 h-4 mr-2" />
-//                                   {isLoading ? "Processing..." : "Submit Answers"}
-//                                 </Button>
-//                               </div>
-//                             )}
-//                           </div>
-//                         </div>
-//                       )}
-//                     </div>
-//                   ))}
-//                   <div ref={historyEndRef} />
-//                 </div>
-//               )}
-//             </div>
-
-//             {/* Input Area */}
-//             <div className="border-t border-border/50 bg-muted/20 p-4 space-y-3 shrink-0">
-//               <div className="relative">
-//                 <textarea
-//                   ref={textareaRef}
-//                   value={prompt}
-//                   onChange={(e) => setPrompt(e.target.value)}
-//                   placeholder="Describe what you want to build..."
-//                   className="w-full min-h-[100px] px-4 py-3 text-sm rounded-xl bg-background border border-input hover:border-ring focus:border-ring focus:ring-2 focus:ring-ring/20 text-foreground resize-none transition-all outline-none placeholder:text-muted-foreground pr-24"
-//                   disabled={isLoading}
-//                   onKeyDown={(e) => {
-//                     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-//                       handleGenerate()
-//                     }
-//                   }}
-//                 />
-//                 <div className="absolute bottom-3 right-3 flex items-center gap-2">
-//                   <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-//                     <Command className="w-3 h-3" />
-//                     <span>↵</span>
-//                   </kbd>
-//                 </div>
-//               </div>
-
-//               <div className="flex gap-2">
-//                 <Button
-//                   onClick={handleGenerate}
-//                   disabled={isLoading || !prompt.trim()}
-//                   className="flex-1 h-11 rounded-xl font-medium shadow-sm"
-//                   size="lg"
-//                 >
-//                   {isLoading ? (
-//                     <>
-//                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-//                       Generating...
-//                     </>
-//                   ) : (
-//                     <>
-//                       <Sparkles className="w-4 h-4 mr-2" />
-//                       Generate Code
-//                     </>
-//                   )}
-//                 </Button>
-
-//                 {chatHistory.length > 0 && (
-//                   <Button
-//                     variant="outline"
-//                     size="lg"
-//                     onClick={clearHistory}
-//                     title="Clear conversation"
-//                     className="h-11 px-4 rounded-xl border-border/50 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors bg-transparent"
-//                   >
-//                     <Trash2 className="w-4 h-4" />
-//                   </Button>
-//                 )}
-//               </div>
-//             </div>
-//           </div>
-//         </DialogContent>
-//       </Dialog>
-//     </>
-//   )
-// }
-
-
 "use client"
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { useAICodeGeneration } from "@/hooks/useAICodeGeneration"
-import {
-  Loader2, Sparkles, AlertCircle, CheckCircle2, FileCode2,
-  Trash2, Send, Bot, User, MessageSquarePlus, ListTodo,
-  Circle, CheckCircle, ChevronDown, X,
-} from "lucide-react"
+import { Loader2, Sparkles, AlertCircle, CheckCircle2, FileCode2, Trash2, Send, MessageSquarePlus, ListTodo, Circle, CheckCircle, ChevronDown, X, ArrowUp } from "lucide-react"
 
-interface Todo {
-  id: string; title: string; description: string
-  priority: "high" | "medium" | "low"; tags: string[]; completed: boolean
-}
-interface ClarificationQuestion {
-  id: string; label: string; type: "text" | "textarea" | "single-select" | "multi-select"
-  required?: boolean; placeholder?: string; options?: string[]
-}
-interface ChatMessage {
-  id: string; type: "prompt" | "response" | "clarification"
-  content: string; error?: string; files?: Record<string, string>
-  mergeStrategy?: Record<string, string>; todos?: Todo[]
-  questions?: ClarificationQuestion[]
-}
+// ── Design tokens ─────────────────────────────────────────────────────────────
+const BG      = "#f5f5f3"
+const SURFACE = "#ffffff"
+const BORDER  = "#e3e3e0"
+const BRHOVER = "#c8c8c4"
+const TEXT    = "#1a1a1a"
+const SUB     = "#6b6b6b"
+const MUTED   = "#a8a8a4"
+const SANS: React.CSSProperties = { fontFamily: "'Geist', 'Inter', system-ui, sans-serif" }
+const MONO: React.CSSProperties = { fontFamily: "'Geist Mono', 'DM Mono', monospace" }
 
-const MONO = { fontFamily: "'DM Mono', monospace" }
+interface Todo { id: string; title: string; description: string; priority: "high"|"medium"|"low"; tags: string[]; completed: boolean }
+interface ClarificationQuestion { id: string; label: string; type: "text"|"textarea"|"single-select"|"multi-select"; required?: boolean; placeholder?: string; options?: string[] }
+interface ChatMessage { id: string; type: "prompt"|"response"|"clarification"; content: string; error?: string; files?: Record<string,string>; mergeStrategy?: Record<string,string>; todos?: Todo[]; questions?: ClarificationQuestion[] }
 
-function getPriorityStyle(priority: string) {
-  switch (priority) {
-    case "high": return { color: "#f87171", background: "rgba(248,113,113,0.1)", border: "rgba(248,113,113,0.25)" }
-    case "medium": return { color: "#fbbf24", background: "rgba(251,191,36,0.1)", border: "rgba(251,191,36,0.25)" }
-    case "low": return { color: "#60a5fa", background: "rgba(96,165,250,0.1)", border: "rgba(96,165,250,0.25)" }
-    default: return { color: "#6b7688", background: "rgba(107,118,136,0.1)", border: "rgba(107,118,136,0.25)" }
-  }
+function priorityStyle(p: string) {
+  if (p === "high")   return { color: "#b94040", bg: "#fdf0f0", border: "#f0c8c8" }
+  if (p === "medium") return { color: "#8a5c10", bg: "#fdf6ea", border: "#e8d4a0" }
+  return                     { color: "#1d5fa6", bg: "#eef4fb", border: "#bfd4ee" }
 }
 
 export default function AICodeGenerator({ onClose }: { onClose?: () => void }) {
   const [prompt, setPrompt] = useState("")
-  const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>({})
-  const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set())
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const { isLoading, chatHistory, generateCode, clearHistory } = useAICodeGeneration()
-  const historyEndRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const endRef            = useRef<HTMLDivElement>(null)
+  const textareaRef       = useRef<HTMLTextAreaElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    historyEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    const el = scrollContainerRef.current
+    if (el) el.scrollTop = el.scrollHeight
   }, [chatHistory])
+  useEffect(() => { setTimeout(() => textareaRef.current?.focus(), 80) }, [])
 
-  useEffect(() => {
-    setTimeout(() => textareaRef.current?.focus(), 80)
-  }, [])
+  function growTextarea(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setPrompt(e.target.value)
+    e.target.style.height = "auto"
+    e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px"
+  }
 
   function toggleExpanded(id: string) {
-    setExpandedMessages((prev) => {
-      const s = new Set(prev)
-      s.has(id) ? s.delete(id) : s.add(id)
-      return s
-    })
+    setExpanded((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
   }
 
   async function handleGenerate() {
-    if (!prompt.trim()) return
-    await generateCode({ prompt })
-    setPrompt("")
+    if (!prompt.trim() || isLoading) return
+    await generateCode({ prompt }); setPrompt("")
+    if (textareaRef.current) textareaRef.current.style.height = "auto"
   }
 
   async function handleSubmitClarification() {
-    const answers = Object.entries(clarificationAnswers).map(([k, v]) => `${k}: ${v}`).join("\n")
-    if (!answers.trim()) return
-    await generateCode({ prompt: answers })
-    setClarificationAnswers({})
+    const a = Object.entries(answers).map(([k,v]) => `${k}: ${v}`).join("\n")
+    if (!a.trim()) return
+    await generateCode({ prompt: a }); setAnswers({})
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleGenerate() }
   }
 
   return (
-    <div className="h-full flex flex-col bg-[#080a0e] border-l border-white/7" style={MONO}>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: BG, borderRight: `1px solid ${BORDER}`, ...SANS }}>
 
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/7 flex-shrink-0">
-        <div className="flex items-center gap-[10px]">
-          <div className="w-7 h-7 rounded-lg bg-[rgba(200,240,75,0.12)] border border-[rgba(200,240,75,0.2)] flex items-center justify-center flex-shrink-0">
-            <Sparkles size={13} className="text-[#c8f04b]" />
-          </div>
-          <div>
-            <div className="text-[12px] font-bold tracking-tight text-[#f0f2f5]" style={{ fontFamily: "'Syne', sans-serif" }}>
-              AI Assistant
-            </div>
-            <div className="text-[9px] tracking-[0.1em] uppercase text-white/25 mt-[1px]">AI Assistant</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 40, padding: "0 14px", borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: TEXT, letterSpacing: "-0.01em" }}>Ask AI</span>
+        <div style={{ display: "flex", gap: 2 }}>
           {chatHistory.length > 0 && (
-            <button
-              onClick={clearHistory}
-              title="Clear conversation"
-              className="w-7 h-7 flex items-center justify-center rounded-md text-white/25 hover:text-red-400 hover:bg-red-500/10 transition-all duration-150"
-            >
-              <Trash2 size={12} />
-            </button>
+            <IconBtn onClick={clearHistory} title="Clear"><Trash2 size={12} /></IconBtn>
           )}
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="w-7 h-7 flex items-center justify-center rounded-md text-white/25 hover:text-[#f0f2f5] hover:bg-white/5 transition-all duration-150"
-            >
-              <X size={12} />
-            </button>
-          )}
+          {onClose && <IconBtn onClick={onClose} title="Close"><X size={12} /></IconBtn>}
         </div>
       </div>
 
-      {/* ── Chat history ── */}
-      <div className="flex-1 overflow-y-auto min-h-0 px-3 py-4 space-y-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
+      {/* Messages */}
+      <div
+        ref={scrollContainerRef}
+        style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "14px 0 6px" }}
+      >
         {chatHistory.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-6 py-12">
-            <div className="w-12 h-12 rounded-xl bg-[rgba(200,240,75,0.06)] border border-[rgba(200,240,75,0.12)] flex items-center justify-center mb-4">
-              <MessageSquarePlus size={20} className="text-[#c8f04b] opacity-60" />
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "60px 24px", height: "100%" }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: BORDER, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+              <MessageSquarePlus size={18} style={{ color: MUTED }} />
             </div>
-            <div className="text-[13px] font-bold text-[#f0f2f5] mb-1" style={{ fontFamily: "'Syne', sans-serif" }}>
-              Start a conversation
-            </div>
-            <p className="text-[11px] text-white/30 leading-relaxed max-w-[220px]">
-              Describe what you want to build and I'll generate the code for you.
-            </p>
+            <p style={{ fontSize: 13, fontWeight: 600, color: TEXT, marginBottom: 5, letterSpacing: "-0.01em" }}>Ask Nebula Anything</p>
+            <p style={{ fontSize: 11, color: MUTED, lineHeight: 1.55, maxWidth: 180 }}>Describe what you want to build and AI will write the code.</p>
           </div>
         ) : (
-          chatHistory.map((message) => (
-            <div key={message.id} className="space-y-3">
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {chatHistory.map((msg) => (
+              <div key={msg.id}>
 
-              {/* User prompt */}
-              {message.type === "prompt" && (
-                <div className="flex gap-2 justify-end">
-                  <div className="max-w-[85%] bg-[rgba(200,240,75,0.09)] border border-[rgba(200,240,75,0.15)] px-3 py-2 rounded-xl rounded-br-sm text-[12px] text-[#f0f2f5] leading-relaxed">
-                    {message.content}
+                {/* User */}
+                {msg.type === "prompt" && (
+                  <div style={{ padding: "0 14px", display: "flex", justifyContent: "flex-end" }}>
+                    <div style={{ background: TEXT, borderRadius: "12px 12px 3px 12px", padding: "8px 12px", fontSize: 12, lineHeight: 1.55, color: "#fff", maxWidth: "88%", ...MONO }}>
+                      {msg.content}
+                    </div>
                   </div>
-                  <div className="w-6 h-6 rounded-full bg-[#151820] border border-white/10 flex items-center justify-center flex-shrink-0 mt-1">
-                    <User size={10} className="text-white/50" />
-                  </div>
-                </div>
-              )}
+                )}
 
-              {/* AI response */}
-              {message.type === "response" && (
-                <div className="flex gap-2">
-                  <div className="w-6 h-6 rounded-full bg-[rgba(200,240,75,0.12)] border border-[rgba(200,240,75,0.2)] flex items-center justify-center flex-shrink-0 mt-1">
-                    <Bot size={10} className="text-[#c8f04b]" />
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-2">
-                    {message.error ? (
-                      <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
-                        <AlertCircle size={13} className="text-red-400 mt-[1px] flex-shrink-0" />
-                        <p className="text-[11px] text-red-400 leading-relaxed">{message.error}</p>
+                {/* AI */}
+                {msg.type === "response" && (
+                  <div style={{ padding: "0 14px" }}>
+                    {msg.error ? (
+                      <div style={{ background: "#fdf0f0", border: "1px solid #f0c8c8", borderRadius: 9, padding: "9px 11px", display: "flex", gap: 7 }}>
+                        <AlertCircle size={11} style={{ color: "#b94040", marginTop: 1, flexShrink: 0 }} />
+                        <p style={{ fontSize: 11, color: "#b94040", lineHeight: 1.5 }}>{msg.error}</p>
                       </div>
                     ) : (
-                      <>
-                        {message.content && (
-                          <div className="bg-[#0f1117] border border-white/7 px-3 py-2 rounded-xl rounded-bl-sm">
-                            <p className="text-[12px] text-white/70 leading-relaxed">{message.content}</p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                        {msg.content && (
+                          <div>
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, color: MUTED, marginBottom: 4 }}>
+                              <Sparkles size={9} /><span style={MONO}>Thought</span>
+                            </div>
+                            <p style={{ fontSize: 12, color: SUB, lineHeight: 1.6 }}>{msg.content}</p>
                           </div>
                         )}
 
-                        {message.files && Object.keys(message.files).length > 0 && (
-                          <div className="bg-[rgba(200,240,75,0.06)] border border-[rgba(200,240,75,0.15)] rounded-xl overflow-hidden">
-                            <button
-                              onClick={() => toggleExpanded(message.id)}
-                              className="w-full flex items-center justify-between p-3 hover:bg-[rgba(200,240,75,0.04)] transition-colors"
+                        {msg.files && Object.keys(msg.files).length > 0 && (
+                          <div style={{ border: `1px solid ${BORDER}`, borderRadius: 9, overflow: "hidden", background: SURFACE }}>
+                            <button onClick={() => toggleExpanded(msg.id)}
+                              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 11px", background: "transparent", border: "none", cursor: "pointer" }}
+                              onMouseOver={(e) => { (e.currentTarget as HTMLElement).style.background = BG }}
+                              onMouseOut={(e)  => { (e.currentTarget as HTMLElement).style.background = "transparent" }}
                             >
-                              <div className="flex items-center gap-2">
-                                <CheckCircle2 size={12} className="text-[#c8f04b]" />
-                                <span className="text-[11px] font-medium text-[#c8f04b]">
-                                  {Object.keys(message.files).length} file{Object.keys(message.files).length !== 1 ? "s" : ""} generated
-                                </span>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <CheckCircle2 size={11} style={{ color: "#2d7a2d" }} />
+                                <span style={{ fontSize: 11, fontWeight: 500, color: TEXT, ...SANS }}>Changed {Object.keys(msg.files).length} file{Object.keys(msg.files).length !== 1 ? "s" : ""}</span>
                               </div>
-                              <ChevronDown
-                                size={12}
-                                className="text-[#c8f04b] transition-transform duration-200"
-                                style={{ transform: expandedMessages.has(message.id) ? "rotate(0deg)" : "rotate(-90deg)" }}
-                              />
+                              <ChevronDown size={11} style={{ color: MUTED, transform: expanded.has(msg.id) ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
                             </button>
-                            {expandedMessages.has(message.id) && (
-                              <div className="px-3 pb-3 pt-0 border-t border-[rgba(200,240,75,0.1)] space-y-1">
-                                {Object.keys(message.files).map((fp) => (
-                                  <div key={fp} className="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-[rgba(200,240,75,0.06)] transition-colors">
-                                    <FileCode2 size={11} className="text-[#c8f04b] flex-shrink-0" />
-                                    <span className="text-[11px] text-white/60 truncate">{fp}</span>
-                                    {message.mergeStrategy?.[fp] === "append" && (
-                                      <span className="text-[9px] px-[6px] py-[2px] rounded-full bg-blue-500/15 border border-blue-500/25 text-blue-400 whitespace-nowrap flex-shrink-0">
-                                        appended
-                                      </span>
+                            {expanded.has(msg.id) && (
+                              <div style={{ borderTop: `1px solid ${BORDER}`, padding: "4px 0" }}>
+                                {Object.keys(msg.files).map((fp) => (
+                                  <div key={fp} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 11px" }}
+                                    onMouseOver={(e) => { (e.currentTarget as HTMLElement).style.background = BG }}
+                                    onMouseOut={(e)  => { (e.currentTarget as HTMLElement).style.background = "transparent" }}
+                                  >
+                                    <FileCode2 size={10} style={{ color: MUTED, flexShrink: 0 }} />
+                                    <span style={{ fontSize: 11, color: SUB, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...MONO }}>{fp}</span>
+                                    {msg.mergeStrategy?.[fp] === "append" && (
+                                      <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 99, background: "#eef4fb", border: "1px solid #bfd4ee", color: "#1d5fa6", flexShrink: 0 }}>+</span>
                                     )}
                                   </div>
                                 ))}
@@ -788,40 +158,30 @@ export default function AICodeGenerator({ onClose }: { onClose?: () => void }) {
                           </div>
                         )}
 
-                        {message.todos && message.todos.length > 0 && (
-                          <div className="bg-[rgba(168,85,247,0.06)] border border-[rgba(168,85,247,0.2)] rounded-xl p-3 space-y-2">
-                            <div className="flex items-center gap-2 mb-1">
-                              <ListTodo size={12} className="text-purple-400" />
-                              <span className="text-[11px] font-medium text-purple-400">
-                                {message.todos.length} task{message.todos.length !== 1 ? "s" : ""}
-                              </span>
+                        {msg.todos && msg.todos.length > 0 && (
+                          <div style={{ border: `1px solid ${BORDER}`, borderRadius: 9, overflow: "hidden", background: SURFACE }}>
+                            <div style={{ padding: "7px 11px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 5 }}>
+                              <ListTodo size={11} style={{ color: MUTED }} />
+                              <span style={{ fontSize: 11, fontWeight: 500, color: TEXT, ...SANS }}>{msg.todos.length} task{msg.todos.length !== 1 ? "s" : ""}</span>
                             </div>
-                            {message.todos.map((todo) => {
-                              const ps = getPriorityStyle(todo.priority)
+                            {msg.todos.map((todo) => {
+                              const ps = priorityStyle(todo.priority)
                               return (
-                                <div key={todo.id} className="bg-[#080a0e] rounded-lg p-3 border border-white/7 space-y-1">
-                                  <div className="flex items-start gap-2">
-                                    {todo.completed
-                                      ? <CheckCircle size={12} className="text-[#c8f04b] mt-[2px] flex-shrink-0" />
-                                      : <Circle size={12} className="text-white/25 mt-[2px] flex-shrink-0" />}
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 flex-wrap mb-[3px]">
-                                        <span className="text-[12px] font-medium text-[#f0f2f5]">{todo.title}</span>
-                                        <span
-                                          className="text-[9px] px-[6px] py-[2px] rounded-full border font-medium uppercase tracking-wide"
-                                          style={{ color: ps.color, background: ps.background, borderColor: ps.border }}
-                                        >
-                                          {todo.priority}
-                                        </span>
+                                <div key={todo.id} style={{ padding: "7px 11px", borderBottom: `1px solid ${BORDER}` }}
+                                  onMouseOver={(e) => { (e.currentTarget as HTMLElement).style.background = BG }}
+                                  onMouseOut={(e)  => { (e.currentTarget as HTMLElement).style.background = "transparent" }}
+                                >
+                                  <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
+                                    {todo.completed ? <CheckCircle size={11} style={{ color: "#2d7a2d", marginTop: 1, flexShrink: 0 }} /> : <Circle size={11} style={{ color: BORDER, marginTop: 1, flexShrink: 0 }} />}
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 2 }}>
+                                        <span style={{ fontSize: 11, fontWeight: 500, color: TEXT }}>{todo.title}</span>
+                                        <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 99, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", color: ps.color, background: ps.bg, border: `1px solid ${ps.border}` }}>{todo.priority}</span>
                                       </div>
-                                      <p className="text-[11px] text-white/35 leading-relaxed">{todo.description}</p>
+                                      <p style={{ fontSize: 11, color: MUTED, lineHeight: 1.5 }}>{todo.description}</p>
                                       {(todo.tags ?? []).length > 0 && (
-                                        <div className="flex flex-wrap gap-1 mt-[6px]">
-                                          {(todo.tags ?? []).map((tag, i) => (
-                                            <span key={i} className="text-[9px] px-[6px] py-[2px] rounded-full bg-white/5 text-white/35">
-                                              {tag}
-                                            </span>
-                                          ))}
+                                        <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 4 }}>
+                                          {(todo.tags ?? []).map((tag, i) => <span key={i} style={{ fontSize: 9, padding: "1px 5px", borderRadius: 99, background: BG, color: SUB }}>{tag}</span>)}
                                         </div>
                                       )}
                                     </div>
@@ -831,141 +191,102 @@ export default function AICodeGenerator({ onClose }: { onClose?: () => void }) {
                             })}
                           </div>
                         )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Clarification */}
-              {message.type === "clarification" && (
-                <div className="flex gap-2">
-                  <div className="w-6 h-6 rounded-full bg-blue-500/15 border border-blue-500/25 flex items-center justify-center flex-shrink-0 mt-1">
-                    <AlertCircle size={10} className="text-blue-400" />
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-2">
-                    {message.content && (
-                      <div className="bg-blue-500/8 border border-blue-500/20 px-3 py-2 rounded-xl">
-                        <p className="text-[12px] text-white/70 whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                      </div>
-                    )}
-                    {message.questions && message.questions.length > 0 && (
-                      <div className="space-y-3 bg-[#0f1117] rounded-xl p-3 border border-white/7">
-                        {message.questions.map((q, idx) => (
-                          <div key={q.id} className="space-y-[6px]">
-                            <p className="text-[11px] font-medium text-[#f0f2f5] flex items-start gap-2">
-                              <span className="w-4 h-4 rounded-full bg-blue-500/15 border border-blue-500/25 text-blue-400 flex items-center justify-center text-[9px] font-bold flex-shrink-0 mt-[1px]">
-                                {idx + 1}
-                              </span>
-                              <span>{q.label}{q.required && <span className="text-red-400 ml-1">*</span>}</span>
-                            </p>
-
-                            {q.type === "single-select" && (
-                              <select
-                                value={clarificationAnswers[q.id] || ""}
-                                onChange={(e) => setClarificationAnswers({ ...clarificationAnswers, [q.id]: e.target.value })}
-                                className="w-full px-3 py-2 text-[12px] rounded-lg bg-[#080a0e] border border-white/7 text-[#f0f2f5] outline-none focus:border-[#c8f04b]/40 transition-all"
-                                style={MONO}
-                              >
-                                <option value="">Select an option…</option>
-                                {q.options?.map((o) => <option key={o} value={o}>{o}</option>)}
-                              </select>
-                            )}
-
-                            {q.type === "multi-select" && (
-                              <div className="grid grid-cols-2 gap-1">
-                                {q.options?.map((o) => {
-                                  const checked = (clarificationAnswers[q.id] || "").split(",").includes(o)
-                                  return (
-                                    <label
-                                      key={o}
-                                      className={`flex items-center gap-2 px-2 py-[7px] rounded-lg border cursor-pointer transition-all text-[11px] ${checked
-                                          ? "bg-[rgba(200,240,75,0.08)] border-[rgba(200,240,75,0.2)] text-[#c8f04b]"
-                                          : "bg-[#080a0e] border-white/7 text-white/50 hover:border-white/15"
-                                        }`}
-                                    >
-                                      <input
-                                        type="checkbox" value={o} checked={checked}
-                                        onChange={(e) => {
-                                          const cur = (clarificationAnswers[q.id] || "").split(",").filter(Boolean)
-                                          e.target.checked ? cur.push(o) : cur.splice(cur.indexOf(o), 1)
-                                          setClarificationAnswers({ ...clarificationAnswers, [q.id]: cur.join(",") })
-                                        }}
-                                        className="w-3 h-3 accent-[#c8f04b]"
-                                      />
-                                      {o}
-                                    </label>
-                                  )
-                                })}
-                              </div>
-                            )}
-
-                            {(q.type === "text") && (
-                              <input
-                                type="text"
-                                value={clarificationAnswers[q.id] || ""}
-                                onChange={(e) => setClarificationAnswers({ ...clarificationAnswers, [q.id]: e.target.value })}
-                                placeholder={q.placeholder || "Enter your answer…"}
-                                className="w-full px-3 py-2 text-[12px] rounded-lg bg-[#080a0e] border border-white/7 text-[#f0f2f5] outline-none focus:border-[#c8f04b]/40 placeholder:text-white/20 transition-all"
-                                style={MONO}
-                              />
-                            )}
-
-                            {(q.type === "textarea") && (
-                              <textarea
-                                value={clarificationAnswers[q.id] || ""}
-                                onChange={(e) => setClarificationAnswers({ ...clarificationAnswers, [q.id]: e.target.value })}
-                                placeholder={q.placeholder || "Enter your answer…"}
-                                className="w-full min-h-[70px] px-3 py-2 text-[12px] rounded-lg bg-[#080a0e] border border-white/7 text-[#f0f2f5] outline-none focus:border-[#c8f04b]/40 placeholder:text-white/20 resize-none transition-all"
-                                style={MONO}
-                              />
-                            )}
-                          </div>
-                        ))}
-
-                        <button
-                          onClick={handleSubmitClarification}
-                          disabled={isLoading || message.questions!.some((q) => q.required && !clarificationAnswers[q.id]?.trim())}
-                          className="w-full mt-1 inline-flex items-center justify-center gap-2 py-[9px] rounded-lg text-[11px] font-medium bg-[rgba(200,240,75,0.1)] border border-[rgba(200,240,75,0.2)] text-[#c8f04b] hover:bg-[rgba(200,240,75,0.18)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                          style={MONO}
-                        >
-                          <Send size={11} />
-                          {isLoading ? "Processing…" : "Submit Answers"}
-                        </button>
                       </div>
                     )}
                   </div>
-                </div>
-              )}
-            </div>
-          ))
+                )}
+
+                {/* Clarification */}
+                {msg.type === "clarification" && (
+                  <div style={{ padding: "0 14px" }}>
+                    {msg.content && <p style={{ fontSize: 12, color: SUB, lineHeight: 1.6, marginBottom: 8, whiteSpace: "pre-wrap" }}>{msg.content}</p>}
+                    {msg.questions && msg.questions.length > 0 && (
+                      <div style={{ border: `1px solid ${BORDER}`, borderRadius: 9, background: SURFACE, overflow: "hidden" }}>
+                        <div style={{ padding: "10px 11px", display: "flex", flexDirection: "column", gap: 10 }}>
+                          {msg.questions.map((q, idx) => (
+                            <div key={q.id}>
+                              <p style={{ fontSize: 11, fontWeight: 500, color: TEXT, marginBottom: 5, display: "flex", gap: 6, alignItems: "flex-start" }}>
+                                <span style={{ width: 15, height: 15, borderRadius: "50%", background: BG, border: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: MUTED, flexShrink: 0, ...MONO }}>{idx + 1}</span>
+                                <span>{q.label}{q.required && <span style={{ color: "#b94040", marginLeft: 2 }}>*</span>}</span>
+                              </p>
+                              {q.type === "single-select" && (
+                                <select value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
+                                  style={{ width: "100%", padding: "6px 9px", fontSize: 11, borderRadius: 7, background: BG, border: `1px solid ${BORDER}`, color: TEXT, outline: "none", ...MONO }}>
+                                  <option value="">Select…</option>
+                                  {q.options?.map((o) => <option key={o} value={o}>{o}</option>)}
+                                </select>
+                              )}
+                              {q.type === "multi-select" && (
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                                  {q.options?.map((o) => {
+                                    const checked = (answers[q.id] || "").split(",").includes(o)
+                                    return (
+                                      <label key={o} style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 7px", borderRadius: 7, cursor: "pointer", border: `1px solid ${checked ? BRHOVER : BORDER}`, background: checked ? BORDER : BG, fontSize: 11, color: SUB }}>
+                                        <input type="checkbox" value={o} checked={checked}
+                                          onChange={(e) => { const cur = (answers[q.id] || "").split(",").filter(Boolean); e.target.checked ? cur.push(o) : cur.splice(cur.indexOf(o), 1); setAnswers({ ...answers, [q.id]: cur.join(",") }) }}
+                                          style={{ width: 11, height: 11, accentColor: TEXT }} />
+                                        {o}
+                                      </label>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                              {q.type === "text" && (
+                                <input type="text" value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} placeholder={q.placeholder || "Answer…"}
+                                  style={{ width: "100%", padding: "6px 9px", fontSize: 11, borderRadius: 7, background: BG, border: `1px solid ${BORDER}`, color: TEXT, outline: "none", boxSizing: "border-box", ...MONO }} />
+                              )}
+                              {q.type === "textarea" && (
+                                <textarea value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} placeholder={q.placeholder || "Answer…"}
+                                  style={{ width: "100%", minHeight: 60, padding: "6px 9px", fontSize: 11, borderRadius: 7, background: BG, border: `1px solid ${BORDER}`, color: TEXT, outline: "none", resize: "none", boxSizing: "border-box", ...MONO }} />
+                              )}
+                            </div>
+                          ))}
+                          <button onClick={handleSubmitClarification} disabled={isLoading || msg.questions!.some((q) => q.required && !answers[q.id]?.trim())}
+                            style={{ width: "100%", padding: "7px 11px", borderRadius: 7, background: TEXT, color: "#fff", fontSize: 11, fontWeight: 500, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, cursor: "pointer", opacity: isLoading || msg.questions!.some((q) => q.required && !answers[q.id]?.trim()) ? 0.35 : 1, transition: "opacity 0.15s", ...SANS }}>
+                            <Send size={10} />{isLoading ? "Processing…" : "Submit"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+            <div style={{ height: 8 }} />
+          </div>
         )}
-        <div ref={historyEndRef} />
       </div>
 
-      {/* ── Input area ── */}
-      <div className="border-t border-white/7 p-3 space-y-2 flex-shrink-0">
-        <textarea
-          ref={textareaRef}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Describe what you want to build…"
-          disabled={isLoading}
-          onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") handleGenerate() }}
-          className="w-full min-h-[80px] px-3 py-[10px] text-[12px] rounded-xl bg-[#0f1117] border border-white/7 text-[#f0f2f5] resize-none outline-none focus:border-[#c8f04b]/40 focus:shadow-[0_0_0_3px_rgba(200,240,75,0.06)] placeholder:text-white/20 transition-all disabled:opacity-40"
-          style={MONO}
-        />
-        <button
-          onClick={handleGenerate}
-          disabled={isLoading || !prompt.trim()}
-          className="w-full inline-flex items-center justify-center gap-2 py-[10px] rounded-xl text-[12px] font-medium bg-[#c8f04b] text-[#080a0e] hover:bg-[#d9ff5c] hover:shadow-[0_0_16px_rgba(200,240,75,0.25)] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200"
-          style={MONO}
+      {/* Composer */}
+      <div style={{ borderTop: `1px solid ${BORDER}`, padding: "10px 12px 12px", background: BG, flexShrink: 0 }}>
+        <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 12, boxShadow: "0 1px 3px rgba(0,0,0,0.05)", overflow: "hidden", transition: "border-color 0.15s, box-shadow 0.15s" }}
+          onFocusCapture={(e) => { e.currentTarget.style.borderColor = BRHOVER; e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.08), 0 0 0 3px rgba(26,26,26,0.05)" }}
+          onBlurCapture={(e)  => { e.currentTarget.style.borderColor = BORDER;  e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.05)" }}
         >
-          {isLoading
-            ? <><Loader2 size={13} className="animate-spin" /> Generating…</>
-            : <><Sparkles size={13} /> Generate Code</>}
-        </button>
+          <textarea ref={textareaRef} value={prompt} onChange={growTextarea} onKeyDown={handleKeyDown}
+            placeholder="Ask Nebula Anything…" disabled={isLoading} rows={1}
+            style={{ width: "100%", padding: "10px 12px 4px", fontSize: 12, lineHeight: 1.55, color: TEXT, background: "transparent", border: "none", outline: "none", resize: "none", display: "block", boxSizing: "border-box", minHeight: 36, maxHeight: 160, ...MONO }}
+          />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 8px 8px" }}>
+            <span style={{ fontSize: 10, color: MUTED, userSelect: "none", ...MONO }}>↵ send · ⇧↵ newline</span>
+            <button onClick={handleGenerate} disabled={isLoading || !prompt.trim()}
+              style={{ width: 26, height: 26, borderRadius: 7, background: prompt.trim() && !isLoading ? TEXT : BORDER, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: prompt.trim() && !isLoading ? "pointer" : "default", transition: "background 0.15s", flexShrink: 0 }}>
+              {isLoading ? <Loader2 size={12} style={{ color: MUTED, animation: "spin 1s linear infinite" }} /> : <ArrowUp size={12} style={{ color: prompt.trim() ? "#fff" : MUTED }} />}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
+  )
+}
+
+// ── Shared icon button ────────────────────────────────────────────────────────
+function IconBtn({ children, onClick, title }: { children: React.ReactNode; onClick?: () => void; title?: string }) {
+  return (
+    <button title={title} onClick={onClick}
+      style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: MUTED, cursor: "pointer", transition: "all 0.12s", flexShrink: 0 }}
+      onMouseOver={(e) => { (e.currentTarget as HTMLElement).style.background = BORDER; (e.currentTarget as HTMLElement).style.color = TEXT }}
+      onMouseOut={(e)  => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = MUTED }}
+    >{children}</button>
   )
 }
