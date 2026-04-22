@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "GEMINI_API_KEY is not configured" }, { status: 500 });
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
 
     const systemPrompt = `You are an expert React developer and structured output generator.
 
